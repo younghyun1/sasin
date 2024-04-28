@@ -1,0 +1,24 @@
+[package]
+name = "sasin"
+version = "0.1.0"
+edition = "2021"
+license-file = "LICENSE"
+description = "FOSS, no-nonsense GUI API tester written in Rust and rendered natively on the desktop and the web."
+homepage = "https://www.linkedin.com/in/younghyun-chi-a60b59a9/"
+repository = "https://github.com/younghyun1/sasin"
+readme = "README.md"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = false
+incremental = false
+strip = true
+panic = "abort"
+
+[profile.dev]
+debug = true
+panic = "abort"
+
+[dependencies]
