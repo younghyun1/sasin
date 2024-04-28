@@ -23,6 +23,7 @@ panic = "abort"
 
 [dependencies]
 #gui stuff
+iced = "=0.12.0"
 
 #error handling
 anyhow = "1.0.82"
