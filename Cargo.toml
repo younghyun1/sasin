@@ -9,7 +9,7 @@ repository = "https://github.com/younghyun1/sasin"
 readme = "README.md"
 
 [profile.release]
-opt-level = 3
+opt-level = 3 # apparently, opt-level = 2 produces similarly performant WASM and is much smaller. explore.
 codegen-units = 1
 debug = false
 incremental = false
