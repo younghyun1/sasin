@@ -1,5 +1,5 @@
 use iced::widget::text;
-use iced::{Element, Sandbox};
+use iced::{Element, Sandbox, Settings};
 
 struct GroceryList {}
 
