@@ -1,34 +1,86 @@
-use iced::widget::text;
-use iced::{Element, Sandbox, Settings};
+use iced::{
+    widget::{button, column, text, text_input, Column},
+    Task, Theme,
+};
+use reqwest;
+use std::result::Result as StdResult;
 
-struct GroceryList {}
+#[derive(Default)]
+struct PostmanClone {
+    url: String,
+    response: String,
+    client: reqwest::Client,
+}
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    UrlChanged(String),
+    SendPressed,
+    ResponseReceived(String),
+    ErrorReceived(String),
+}
 
-impl Sandbox for GroceryList {
-    type Message = Message;
-
-    /* Initialize your app */
-    fn new() -> GroceryList {
-        Self {}
-    }
-
-    /**
-    	* The title of the window. It will show up on the top of your application window.
-    	*/
-    fn title(&self) -> String {
-        String::from("Grocery List App")
-    }
-
-    fn update(&mut self, message: Self::Message) {
-        // Update the state of your app
-    }
-
-    fn view(&self) -> Element<Self::Message> {
-        text("This is where you will show the view of your app").into()
+fn update(state: &mut PostmanClone, message: Message) -> Task<Message> {
+    match message {
+        Message::UrlChanged(new_url) => {
+            state.url = new_url;
+            Task::none()
+        }
+        Message::SendPressed => {
+            let url = state.url.clone();
+            let client = state.client.clone();
+            Task::perform(
+                async move {
+                    match fetch_url(url, client).await {
+                        Ok(body) => Message::ResponseReceived(body),
+                        Err(e) => Message::ErrorReceived(format!("Error: {:?}", e)),
+                    }
+                },
+                |msg| msg,
+            )
+        }
+        Message::ResponseReceived(body) => {
+            state.response = body;
+            Task::none()
+        }
+        Message::ErrorReceived(error_message) => {
+            state.response = error_message;
+            Task::none()
+        }
     }
 }
-fn main() -> iced::Result {
-    GroceryList::run(Settings::default())
+
+fn view(state: &PostmanClone) -> Column<Message> {
+    column![
+        text("Enter URL:"),
+        text_input(
+            "https://httpbin.org/get", // placeholder text
+            &state.url,
+        )
+        .on_input(|s| Message::UrlChanged(s))
+        .padding(10),
+        button("Send").padding(10).on_press(Message::SendPressed),
+        text("Response:"),
+        text(&state.response).size(16),
+    ]
+    .padding(20)
+    .spacing(10)
+}
+
+async fn fetch_url(url: String, client: reqwest::Client) -> StdResult<String, reqwest::Error> {
+    let response = client.get(&url).send().await?;
+
+    let body = response.text().await?;
+
+    Ok(body)
+}
+
+pub fn main() -> iced::Result {
+    iced::application("Postman Clone", update, view)
+        .theme(theme)
+        .run()
+}
+
+fn theme(_state: &PostmanClone) -> Theme {
+    Theme::CatppuccinMocha
 }

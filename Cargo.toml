@@ -10,9 +10,11 @@ readme = "README.md"
 
 [profile.release]
 opt-level = 3
+codegen-units = 1
 debug = false
 incremental = false
 strip = true
+lto = true
 panic = "abort"
 
 [profile.dev]
@@ -20,4 +22,5 @@ debug = true
 panic = "abort"
 
 [dependencies]
-iced = "0.12.1"
+iced = { version = "0.13.1", features = ["tokio"] }
+reqwest = "0.12.15"
