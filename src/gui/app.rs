@@ -5,8 +5,11 @@ use iced::widget::{
 use iced::{Element, Length, Task};
 
 use crate::gui::Message;
+use crate::gui::state::{
+    EditorDraft, apply_editor_to_selected_template, load_template_into_editor,
+};
 use crate::http::{self, HttpClientConfig};
-use crate::models::{HeaderEntry, HttpMethod, RequestModel, ResponseModel};
+use crate::models::{HttpMethod, RequestModel, ResponseModel};
 use crate::persist::{
     AppConfig, AppConfigFile, Dataset, DatasetFile, DatasetId, RequestTemplate,
     default_config_path, default_dataset_path, load_startup_dataset,
@@ -152,20 +155,61 @@ impl App {
         match message {
             Message::MethodChanged(method) => {
                 self.request.method = method;
-                return self.mark_dirty_and_maybe_schedule_autosave();
+                return self.apply_editor_mutation_and_maybe_autosave();
             }
             Message::UrlChanged(url) => {
                 self.request.url = url;
-                return self.mark_dirty_and_maybe_schedule_autosave();
+                return self.apply_editor_mutation_and_maybe_autosave();
             }
             Message::HeadersChanged(s) => {
                 self.headers_text = s;
-                return self.mark_dirty_and_maybe_schedule_autosave();
+                return self.apply_editor_mutation_and_maybe_autosave();
             }
             Message::BodyChanged(s) => {
                 self.body_editor = text_editor::Content::with_text(&s);
+                return self.apply_editor_mutation_and_maybe_autosave();
+            }
+
+            Message::TemplateNameChanged(name) => {
+                self.template_name_input = name;
+                return self.apply_editor_mutation_and_maybe_autosave();
+            }
+
+            Message::NewTemplatePressed => {
+                // Create a new template from current editor draft and select it.
+                // This is the "like Postman" flow: if nothing is selected, you can materialize
+                // the current editor into a saved template, then edits mutate it immediately.
+                let id = self.dataset.next_id();
+
+                let draft = self.editor_draft();
+                let name = draft.template_name.trim();
+                let template_name = if name.is_empty() {
+                    format!("Request {id}")
+                } else {
+                    name.to_string()
+                };
+
+                // Headers parsing must succeed to create a template.
+                let headers = match crate::gui::state::parse_headers(&draft.headers_text) {
+                    Ok(h) => h,
+                    Err(e) => {
+                        self.error = Some(e);
+                        return Task::none();
+                    }
+                };
+
+                let mut t =
+                    RequestTemplate::new(id, template_name, draft.method, draft.url.clone());
+                t.headers = headers;
+                t.body = draft.body_option();
+
+                self.dataset.upsert(t);
+                self.selected_template = Some(id);
+                self.dataset_dirty = true;
+
                 return self.mark_dirty_and_maybe_schedule_autosave();
             }
+
             Message::TogglePrettyJson => {
                 self.pretty_json = !self.pretty_json;
                 Task::none()
@@ -408,7 +452,7 @@ impl App {
                     return Task::none();
                 }
 
-                let headers = match parse_headers(&self.headers_text) {
+                let headers = match crate::gui::state::parse_headers(&self.headers_text) {
                     Ok(h) => h,
                     Err(e) => {
                         self.error = Some(e);
@@ -438,14 +482,13 @@ impl App {
                 Task::perform(async move { () }, |_| Message::SaveDataset)
             }
             Message::TemplateSelected(id) => {
-                if let Some(t) = self.dataset.templates.iter().find(|t| t.id == id).cloned() {
+                if let Some(draft) = load_template_into_editor(&self.dataset, id) {
                     self.selected_template = Some(id);
-                    self.template_name_input = t.name.clone();
-                    self.request.method = t.method;
-                    self.request.url = t.url;
-                    self.headers_text = headers_to_text(&t.headers);
-                    self.body_editor =
-                        text_editor::Content::with_text(t.body.as_deref().unwrap_or(""));
+                    self.template_name_input = draft.template_name;
+                    self.request.method = draft.method;
+                    self.request.url = draft.url;
+                    self.headers_text = draft.headers_text;
+                    self.body_editor = text_editor::Content::with_text(&draft.body_text);
                 }
                 Task::none()
             }
@@ -498,7 +541,7 @@ impl App {
                 }
 
                 // Build request model from the UI raw text.
-                let headers = match parse_headers(&self.headers_text) {
+                let headers = match crate::gui::state::parse_headers(&self.headers_text) {
                     Ok(h) => h,
                     Err(e) => {
                         self.error = Some(e);
@@ -661,7 +704,7 @@ impl App {
         let templates = self.view_templates();
 
         let template_name = text_input("Template name…", &self.template_name_input)
-            .on_input(|s| Message::RenameTemplatePressed(self.selected_template.unwrap_or(0), s))
+            .on_input(Message::TemplateNameChanged)
             .padding(12)
             .size(14)
             .width(Length::Fill);
@@ -685,6 +728,9 @@ impl App {
                 button(text("Save As…").size(14))
                     .padding(10)
                     .on_press(Message::SaveDatasetAsPressed),
+                button(text("New Template").size(14))
+                    .padding(10)
+                    .on_press(Message::NewTemplatePressed),
                 button(text(autosave_label).size(14))
                     .padding(10)
                     .on_press(Message::ToggleAutosave),
@@ -979,55 +1025,6 @@ impl App {
     }
 }
 
-fn parse_headers(raw: &str) -> Result<Vec<HeaderEntry>, String> {
-    let mut out = Vec::new();
-
-    for (line_no, line) in raw.lines().enumerate() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        if line.starts_with('#') {
-            continue;
-        }
-
-        let Some((name, value)) = line.split_once(':') else {
-            return Err(format!(
-                "Invalid header on line {} (expected `Name: Value`): {line}",
-                line_no + 1
-            ));
-        };
-
-        let name = name.trim();
-        let value = value.trim();
-
-        if name.is_empty() {
-            return Err(format!("Empty header name on line {}", line_no + 1));
-        }
-
-        out.push(HeaderEntry {
-            name: name.to_string(),
-            value: value.to_string(),
-        });
-    }
-
-    Ok(out)
-}
-
-fn headers_to_text(headers: &[HeaderEntry]) -> String {
-    let mut s = String::new();
-    for h in headers {
-        if h.name.trim().is_empty() {
-            continue;
-        }
-        s.push_str(h.name.trim());
-        s.push_str(": ");
-        s.push_str(h.value.trim());
-        s.push('\n');
-    }
-    s
-}
-
 fn format_response_body(body: &str, pretty_json: bool) -> String {
     if !pretty_json {
         return body.to_string();
@@ -1046,6 +1043,36 @@ impl App {
         if matches!(self.dataset_ui, DatasetUiState::Ready { .. }) {
             self.dataset_dirty = true;
         }
+    }
+
+    fn editor_draft(&self) -> EditorDraft {
+        EditorDraft {
+            method: self.request.method,
+            url: self.request.url.clone(),
+            headers_text: self.headers_text.clone(),
+            body_text: self.body_editor.text(),
+            template_name: self.template_name_input.clone(),
+        }
+    }
+
+    fn apply_editor_mutation_and_maybe_autosave(&mut self) -> Task<Message> {
+        // Immediate mutation:
+        // If a template is selected, apply editor state into it right away.
+        // If parsing fails, surface error and do not mutate.
+        let draft = self.editor_draft();
+        match apply_editor_to_selected_template(&mut self.dataset, self.selected_template, &draft) {
+            Ok(updated) => {
+                if updated {
+                    self.dataset_dirty = true;
+                }
+            }
+            Err(e) => {
+                self.error = Some(e);
+                return Task::none();
+            }
+        }
+
+        self.mark_dirty_and_maybe_schedule_autosave()
     }
 
     fn mark_dirty_and_maybe_schedule_autosave(&mut self) -> Task<Message> {

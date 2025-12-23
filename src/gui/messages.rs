@@ -76,6 +76,18 @@ pub enum Message {
     /// Dataset save finished.
     DatasetSaved(std::path::PathBuf, Result<(), String>),
 
+    /// Create a new template from the current editor state and select it.
+    ///
+    /// This supports the "immediate mutation" workflow: if no template is selected,
+    /// the user can create one, then further edits mutate it immediately.
+    NewTemplatePressed,
+
+    /// User edited the template name draft in the editor.
+    ///
+    /// If a template is selected, this will typically rename it (immediate mutation).
+    /// If no template is selected, this updates the draft name for the next "New Template".
+    TemplateNameChanged(String),
+
     /// Create/update a named request template in the dataset from current editor state.
     SaveTemplatePressed,
 
