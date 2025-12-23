@@ -34,17 +34,17 @@ chrono = { version = "0.4.42", features = ["serde"] }
 # memory allocator
 mimalloc = { version = "0.1.48", features = ["v3"] }
 reqwest = "0.12.28"
-iced = { version = "0.14.0", features = ["tokio"] }
+iced = { version = "0.14.0", features = ["tokio", "advanced"] }
 
 # JSON pretty-printing for response bodies
 serde_json = { version = "1.0.146", features = ["preserve_order"] }
 
 # dataset persistence (compact + fast)
-bitcode = "0.6.9"
-zstd = "0.13.3"
+bitcode = "0.6.7"
+zstd = "0.13.2"
 
 # native file dialogs for dataset open/save
-rfd = "0.16.0"
+rfd = "0.15.2"
 
 [build-dependencies]
 chrono = { version = "0.4.42" }

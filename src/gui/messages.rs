@@ -3,6 +3,15 @@ use crate::models::{HttpMethod, ResponseModel};
 /// Monotonic request identifier used to ignore stale task results.
 pub type RequestId = u64;
 
+/// Identifies which split divider is being dragged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitId {
+    /// Sidebar (templates/history) vs main area.
+    Sidebar,
+    /// Request (top) vs response (bottom) inside the main area.
+    RequestResponse,
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     /// User selected a different HTTP method.
@@ -43,6 +52,10 @@ pub enum Message {
 
     /// Clear request history.
     ClearHistory,
+
+    // --- Resizable panels (split panes) ---
+    /// Dragging a split divider changed its pixel position.
+    SplitDragged(SplitId, f32),
 
     // --- Autosave (dataset/templates) ---
     /// Toggle autosave on/off (persisted in config).

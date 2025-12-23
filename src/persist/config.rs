@@ -27,8 +27,30 @@ pub struct AppConfig {
     /// it as enabled by default (see `load_or_default` fallback path below).
     pub autosave_enabled: bool,
 
+    /// Split pane sizes (pixels). These are clamped by the UI at runtime.
+    pub layout: Option<LayoutState>,
+
     /// Optional window state.
     pub window: Option<WindowState>,
+}
+
+/// Persisted UI layout state (pixel sizes).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
+pub struct LayoutState {
+    /// Width of the left sidebar (templates/history) in pixels.
+    pub sidebar_width_px: u32,
+
+    /// Height of the request editor pane in pixels (top pane of main area).
+    pub request_height_px: u32,
+}
+
+impl Default for LayoutState {
+    fn default() -> Self {
+        Self {
+            sidebar_width_px: 340,
+            request_height_px: 420,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
@@ -80,6 +102,7 @@ impl AppConfigFile {
             return Ok(AppConfig {
                 version: Self::FORMAT_VERSION,
                 autosave_enabled: true,
+                layout: Some(LayoutState::default()),
                 ..AppConfig::default()
             });
         }
@@ -90,16 +113,24 @@ impl AppConfigFile {
         match self.load() {
             Ok(mut cfg) => {
                 // Ensure sane defaults for fields that may be missing or invalid.
-                // (If a legacy decode path ever yields a default `false`, normalize to `true`.)
                 if cfg.version == 0 {
                     cfg.version = Self::FORMAT_VERSION;
                 }
+
+                // Default autosave to enabled when loading older configs.
                 cfg.autosave_enabled = cfg.autosave_enabled || cfg.version < Self::FORMAT_VERSION;
+
+                // Ensure layout defaults exist.
+                if cfg.layout.is_none() {
+                    cfg.layout = Some(LayoutState::default());
+                }
+
                 Ok(cfg)
             }
             Err(_) => Ok(AppConfig {
                 version: Self::FORMAT_VERSION,
                 autosave_enabled: true,
+                layout: Some(LayoutState::default()),
                 ..AppConfig::default()
             }),
         }

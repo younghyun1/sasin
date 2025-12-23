@@ -2,14 +2,16 @@ use iced::widget::{Space, button, column, container, row, text, text_editor};
 use iced::{Element, Length, Task};
 
 use crate::gui::Message;
-use crate::gui::components::{RequestEditor, ResponseView, Section, TemplateList};
+use crate::gui::components::{
+    RequestEditor, ResponseView, Section, Split, SplitAxis, TemplateList,
+};
 use crate::gui::state::{
     EditorDraft, apply_editor_to_selected_template, load_template_into_editor,
 };
 use crate::http::{self, HttpClientConfig};
 use crate::models::{HttpMethod, RequestModel, ResponseModel};
 use crate::persist::{
-    AppConfig, AppConfigFile, Dataset, DatasetFile, DatasetId, RequestTemplate,
+    AppConfig, AppConfigFile, Dataset, DatasetFile, DatasetId, LayoutState, RequestTemplate,
     default_config_path, default_dataset_path, load_startup_dataset,
 };
 
@@ -82,6 +84,10 @@ pub struct App {
     // Autosave (debounced)
     autosave_pending: bool,
 
+    // Resizable panel state (pixels)
+    sidebar_width_px: f32,
+    request_height_px: f32,
+
     config_path: std::path::PathBuf,
     dataset_path: std::path::PathBuf,
     app_config: AppConfig,
@@ -115,6 +121,8 @@ impl App {
             ),
         };
 
+        let layout = cfg.layout.unwrap_or(LayoutState::default());
+
         Self {
             request: RequestModel::default(),
             http_config: HttpClientConfig::default(),
@@ -139,6 +147,10 @@ impl App {
 
             autosave_pending: false,
 
+            // Resizable panels (pixels)
+            sidebar_width_px: layout.sidebar_width_px as f32,
+            request_height_px: layout.request_height_px as f32,
+
             config_path: cfg_path,
             dataset_path: ds_path,
             app_config: cfg,
@@ -151,6 +163,36 @@ impl App {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::SplitDragged(split_id, new_px) => {
+                // Clamp to sane minimums so panes don't collapse.
+                match split_id {
+                    crate::gui::messages::SplitId::Sidebar => {
+                        self.sidebar_width_px = new_px.clamp(240.0, 520.0);
+                    }
+                    crate::gui::messages::SplitId::RequestResponse => {
+                        self.request_height_px = new_px.clamp(220.0, 900.0);
+                    }
+                }
+                // Persist layout immediately; this is lightweight.
+                self.app_config.layout = Some(LayoutState {
+                    sidebar_width_px: self.sidebar_width_px.round() as u32,
+                    request_height_px: self.request_height_px.round() as u32,
+                });
+                let cfg_path = self.config_path.clone();
+                let cfg = self.app_config.clone();
+
+                return Task::perform(
+                    async move {
+                        let f = AppConfigFile::new(cfg_path);
+                        f.save(&cfg).map_err(|e| e.to_string())
+                    },
+                    |res| match res {
+                        Ok(_) => Message::ClearPressed,
+                        Err(e) => Message::RequestFailed(0, e),
+                    },
+                );
+            }
+
             Message::MethodChanged(method) => {
                 self.request.method = method;
                 return self.apply_editor_mutation_and_maybe_autosave();
@@ -656,7 +698,33 @@ impl App {
             }
         }
 
-        // --- Left side: request editor + templates + history (components) ---
+        // --- Sidebar: templates + history (Postman-like left panel) ---
+        let templates = TemplateList::new(&self.dataset)
+            .selected(self.selected_template)
+            .height(Length::Fixed(360.0))
+            .view();
+
+        let history = self.view_history_inline();
+
+        let sidebar = column![
+            Section::new("Templates", templates).into_element(),
+            Section::new("History", history).into_element(),
+            row![
+                button(text("New Template").size(14))
+                    .padding(10)
+                    .on_press(Message::NewTemplatePressed),
+                Space::new().width(Length::Fill),
+                button(text("Clear History").size(14))
+                    .padding(10)
+                    .on_press(Message::ClearHistory),
+            ]
+            .spacing(10)
+        ]
+        .spacing(12.0)
+        .width(Length::Fill)
+        .height(Length::Fill);
+
+        // --- Main area: request on top, response below (Postman-like) ---
         let request_editor = RequestEditor::new(
             self.request.method,
             &self.request.url,
@@ -667,53 +735,41 @@ impl App {
         .autosave_enabled(self.app_config.autosave_enabled)
         .dataset_dirty(self.dataset_dirty)
         .sending(self.sending)
-        .headers_height_px(110.0)
-        .body_height_px(260.0)
+        .headers_height_px(120.0)
+        .body_height_px(240.0)
         .view();
 
-        let templates = TemplateList::new(&self.dataset)
-            .selected(self.selected_template)
-            .height(Length::Fixed(240.0))
-            .view();
-
-        // HistoryList component requires borrowing a slice that outlives this `view` call.
-        // To avoid borrowing a temporary Vec, render history inline here for now.
-        let history = self.view_history_inline();
-
-        let left = column![
-            Section::untitled(request_editor).into_element(),
-            Section::new("Templates", templates).into_element(),
-            Section::new("History", history).into_element(),
-            button(text("Clear History").size(14))
-                .padding(10)
-                .on_press(Message::ClearHistory)
-        ]
-        .spacing(12.0)
-        .width(Length::FillPortion(1))
-        .height(Length::Fill);
-
-        // --- Right side: response (component) ---
-        // ResponseView::body_text takes a borrowed &str; avoid borrowing a temporary String by not
-        // passing a formatted body here. The view will fall back to the raw response body.
         let response_view = ResponseView::new()
             .response(self.response.as_ref())
             .error(self.error.as_deref())
             .show_headers(self.show_headers)
             .pretty_json(self.pretty_json)
             .body_text(None)
+            .headers_height(Length::Fixed(160.0))
             .view();
 
-        let right = Section::untitled(response_view)
-            .width(Length::FillPortion(1))
-            .into_element();
+        // Resizable inner split: request (top) vs response (bottom)
+        let main: Element<'_, Message> = Split::new(SplitAxis::Vertical)
+            .first(Section::untitled(request_editor).into_element())
+            .second(Section::untitled(response_view).into_element())
+            .split_px(self.request_height_px)
+            .min_first_px(220.0)
+            .min_second_px(200.0)
+            .on_drag(|px| Message::SplitDragged(crate::gui::messages::SplitId::RequestResponse, px))
+            .into();
 
-        let content = row![left, right]
-            .spacing(14.0)
-            .padding(14)
-            .width(Length::Fill)
-            .height(Length::Fill);
+        // Resizable outer split: sidebar (left) vs main (right)
+        let content: Element<'_, Message> = Split::new(SplitAxis::Horizontal)
+            .first(sidebar)
+            .second(main)
+            .split_px(self.sidebar_width_px)
+            .min_first_px(240.0)
+            .min_second_px(520.0)
+            .on_drag(|px| Message::SplitDragged(crate::gui::messages::SplitId::Sidebar, px))
+            .into();
 
         container(content)
+            .padding(14)
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
