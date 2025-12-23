@@ -39,7 +39,7 @@ pub struct RequestEditor<'a> {
     pub body_content: &'a text_editor::Content,
 
     // Dataset/template context
-    pub template_name: &'a str,
+    pub request_name: &'a str,
     pub autosave_enabled: bool,
     pub dataset_dirty: bool,
 
@@ -57,14 +57,14 @@ impl<'a> RequestEditor<'a> {
         url: &'a str,
         headers_text: &'a str,
         body_content: &'a text_editor::Content,
-        template_name: &'a str,
+        request_name: &'a str,
     ) -> Self {
         Self {
             method,
             url,
             headers_text,
             body_content,
-            template_name,
+            request_name,
             autosave_enabled: true,
             dataset_dirty: false,
             sending: false,
@@ -123,10 +123,10 @@ impl<'a> RequestEditor<'a> {
             })
             .height(self.body_height_px);
 
-        let template_name_input = text_input("Template name…", self.template_name)
+        let request_name_input = text_input("Request name…", self.request_name)
             // Parent can decide what this means; immediate-mutation mode may
-            // interpret as "rename selected template".
-            .on_input(|s| Message::RenameTemplatePressed(0, s))
+            // interpret as "rename selected request".
+            .on_input(|s| Message::RenameRequestPressed(0, s))
             .padding(12)
             .size(14)
             .width(Length::Fill);
@@ -138,8 +138,8 @@ impl<'a> RequestEditor<'a> {
             Space::new().height(Length::Fixed(10.0)),
             dataset_row,
             Space::new().height(Length::Fixed(10.0)),
-            text("Template Name").size(16),
-            template_name_input,
+            text("Request Name").size(16),
+            request_name_input,
             Space::new().height(Length::Fixed(10.0)),
             text("Headers").size(16),
             headers_editor,
@@ -216,15 +216,15 @@ impl<'a> RequestEditor<'a> {
             .padding(10)
             .on_press(Message::ClearPressed);
 
-        let save_template_btn = button(text("Save Template").size(14))
+        let save_request_btn = button(text("Save Request").size(14))
             .padding(10)
-            .on_press(Message::SaveTemplatePressed);
+            .on_press(Message::SaveRequestPressed);
 
         let save_dataset_btn = button(text("Save Dataset").size(14))
             .padding(10)
             .on_press(Message::SaveDataset);
 
-        row![cancel_btn, clear_btn, save_template_btn, save_dataset_btn]
+        row![cancel_btn, clear_btn, save_request_btn, save_dataset_btn]
             .spacing(10)
             .align_y(Vertical::Center)
             .into()

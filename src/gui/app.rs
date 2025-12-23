@@ -3,16 +3,14 @@ use iced::{Element, Length, Task};
 
 use crate::gui::Message;
 use crate::gui::components::{
-    RequestEditor, ResponseView, Section, Split, SplitAxis, TemplateList,
+    CollectionView, RequestEditor, ResponseView, Section, Split, SplitAxis,
 };
-use crate::gui::state::{
-    EditorDraft, apply_editor_to_selected_template, load_template_into_editor,
-};
+use crate::gui::state::{EditorDraft, apply_editor_to_selected_request, load_request_into_editor};
 use crate::http::{self, HttpClientConfig};
 use crate::models::{HttpMethod, RequestModel, ResponseModel};
 use crate::persist::{
-    AppConfig, AppConfigFile, Dataset, DatasetFile, DatasetId, LayoutState, RequestTemplate,
-    default_config_path, default_dataset_path, load_startup_dataset,
+    AppConfig, AppConfigFile, Dataset, DatasetFile, DatasetId, LayoutState, PersistError, Request,
+    config::ConfigError, default_config_path, default_dataset_path, load_startup_dataset,
 };
 
 #[derive(Debug, Clone)]
@@ -78,8 +76,8 @@ pub struct App {
     dataset_ui: DatasetUiState,
     dataset: Dataset,
     dataset_dirty: bool,
-    selected_template: Option<DatasetId>,
-    template_name_input: String,
+    selected_request: Option<DatasetId>,
+    request_name_input: String,
 
     // Autosave (debounced)
     autosave_pending: bool,
@@ -142,8 +140,8 @@ impl App {
             dataset_ui,
             dataset: ds,
             dataset_dirty: false,
-            selected_template: None,
-            template_name_input: String::new(),
+            selected_request: None,
+            request_name_input: String::new(),
 
             autosave_pending: false,
 
@@ -184,7 +182,7 @@ impl App {
                 return Task::perform(
                     async move {
                         let f = AppConfigFile::new(cfg_path);
-                        f.save(&cfg).map_err(|e| e.to_string())
+                        f.save(&cfg).map_err(|e: ConfigError| e.to_string())
                     },
                     |res| match res {
                         Ok(_) => Message::ClearPressed,
@@ -210,19 +208,19 @@ impl App {
                 return self.apply_editor_mutation_and_maybe_autosave();
             }
 
-            Message::TemplateNameChanged(name) => {
-                self.template_name_input = name;
+            Message::RequestNameChanged(name) => {
+                self.request_name_input = name;
                 return self.apply_editor_mutation_and_maybe_autosave();
             }
 
-            Message::NewTemplatePressed => {
+            Message::NewRequestPressed => {
                 // Create a new template from current editor draft and select it.
                 // This is the "like Postman" flow: if nothing is selected, you can materialize
                 // the current editor into a saved template, then edits mutate it immediately.
                 let id = self.dataset.next_id();
 
                 let draft = self.editor_draft();
-                let name = draft.template_name.trim();
+                let name = draft.request_name.trim();
 
                 // Default name: "<METHOD> <host>" (or "<METHOD> <url>" as fallback).
                 // If URL is not parseable, keep it simple and still deterministic.
@@ -241,7 +239,7 @@ impl App {
                     }
                 };
 
-                let template_name = if name.is_empty() {
+                let request_name = if name.is_empty() {
                     default_name
                 } else {
                     name.to_string()
@@ -256,13 +254,12 @@ impl App {
                     }
                 };
 
-                let mut t =
-                    RequestTemplate::new(id, template_name, draft.method, draft.url.clone());
+                let mut t = Request::new(id, request_name, draft.method, draft.url.clone());
                 t.headers = headers;
                 t.body = draft.body_option();
 
                 self.dataset.upsert(t);
-                self.selected_template = Some(id);
+                self.selected_request = Some(id);
                 self.dataset_dirty = true;
 
                 return self.mark_dirty_and_maybe_schedule_autosave();
@@ -285,7 +282,7 @@ impl App {
                 return Task::perform(
                     async move {
                         let f = AppConfigFile::new(cfg_path);
-                        f.save(&cfg).map_err(|e| e.to_string())
+                        f.save(&cfg).map_err(|e: ConfigError| e.to_string())
                     },
                     |res| match res {
                         Ok(_) => Message::ClearPressed,
@@ -379,14 +376,20 @@ impl App {
                         let file = DatasetFile::new(&path);
                         match file.load_or_default() {
                             Ok(mut ds) => {
-                                // Ensure default template exists.
-                                if ds.templates.is_empty() {
-                                    ds.templates.push(RequestTemplate::new(
+                                // Ensure default collection exists.
+                                if ds.collections.is_empty() {
+                                    let mut new_collection = crate::persist::Collection {
+                                        id: ds.next_id(),
+                                        name: "My Collection".to_string(),
+                                        requests: Vec::new(),
+                                    };
+                                    new_collection.requests.push(Request::new(
                                         ds.next_id(),
                                         "Default",
                                         HttpMethod::Get,
                                         "https://example.com",
                                     ));
+                                    ds.collections.push(new_collection);
                                     let _ = file.save(&ds);
                                 }
 
@@ -401,8 +404,8 @@ impl App {
                                 let cfg_file = AppConfigFile::new(&self.config_path);
                                 let _ = cfg_file.save(&self.app_config);
 
-                                self.selected_template = None;
-                                self.template_name_input.clear();
+                                self.selected_request = None;
+                                self.request_name_input.clear();
                             }
                             Err(e) => {
                                 self.dataset_ui = DatasetUiState::Error {
@@ -434,7 +437,7 @@ impl App {
                 Task::perform(
                     async move {
                         let file = DatasetFile::new(&path_for_task);
-                        file.save(&ds).map_err(|e| e.to_string())?;
+                        file.save(&ds).map_err(|e: PersistError| e.to_string())?;
                         Ok(path2)
                     },
                     move |res| match res {
@@ -470,7 +473,7 @@ impl App {
                     Task::perform(
                         async move {
                             let file = DatasetFile::new(&p);
-                            file.save(&ds).map_err(|e| e.to_string())?;
+                            file.save(&ds).map_err(|e: PersistError| e.to_string())?;
                             Ok(p2)
                         },
                         move |res| match res {
@@ -494,7 +497,7 @@ impl App {
                 }
                 Task::none()
             }
-            Message::SaveTemplatePressed => {
+            Message::SaveRequestPressed => {
                 // Require dataset open
                 let Some(_path) = (match &self.dataset_ui {
                     DatasetUiState::Ready { path } => Some(path),
@@ -504,9 +507,9 @@ impl App {
                     return Task::none();
                 };
 
-                let name = self.template_name_input.trim();
+                let name = self.request_name_input.trim();
                 if name.is_empty() {
-                    self.error = Some("Template name is empty.".to_string());
+                    self.error = Some("Request name is empty.".to_string());
                     return Task::none();
                 }
 
@@ -526,23 +529,22 @@ impl App {
                 };
 
                 let id = self
-                    .selected_template
+                    .selected_request
                     .unwrap_or_else(|| self.dataset.next_id());
-                let mut t =
-                    RequestTemplate::new(id, name, self.request.method, self.request.url.clone());
+                let mut t = Request::new(id, name, self.request.method, self.request.url.clone());
                 t.headers = headers;
                 t.body = body;
                 self.dataset.upsert(t);
                 self.dataset_dirty = true;
-                self.selected_template = Some(id);
+                self.selected_request = Some(id);
 
                 // Persist immediately for "persistently update it"
                 Task::perform(async move { () }, |_| Message::SaveDataset)
             }
-            Message::TemplateSelected(id) => {
-                if let Some(draft) = load_template_into_editor(&self.dataset, id) {
-                    self.selected_template = Some(id);
-                    self.template_name_input = draft.template_name;
+            Message::RequestSelected(id) => {
+                if let Some(draft) = load_request_into_editor(&self.dataset, id) {
+                    self.selected_request = Some(id);
+                    self.request_name_input = draft.request_name;
                     self.request.method = draft.method;
                     self.request.url = draft.url;
                     self.headers_text = draft.headers_text;
@@ -550,28 +552,29 @@ impl App {
                 }
                 Task::none()
             }
-            Message::DeleteTemplatePressed(id) => {
+            Message::DeleteRequestPressed(id) => {
                 if self.dataset.remove(id) {
-                    if self.selected_template == Some(id) {
-                        self.selected_template = None;
-                        self.template_name_input.clear();
+                    if self.selected_request == Some(id) {
+                        self.selected_request = None;
+                        self.request_name_input.clear();
                     }
                     self.dataset_dirty = true;
                     return Task::perform(async move { () }, |_| Message::SaveDataset);
                 }
                 Task::none()
             }
-            Message::RenameTemplatePressed(id, new_name) => {
+            Message::RenameRequestPressed(id, new_name) => {
                 let new_name = new_name.trim();
                 if new_name.is_empty() {
                     return Task::none();
                 }
-                if let Some(t) = self.dataset.templates.iter().find(|t| t.id == id).cloned() {
-                    let mut t2 = t;
-                    t2.name = new_name.to_string();
-                    self.dataset.upsert(t2);
-                    self.dataset_dirty = true;
-                    return Task::perform(async move { () }, |_| Message::SaveDataset);
+
+                for collection in &mut self.dataset.collections {
+                    if let Some(t) = collection.requests.iter_mut().find(|t| t.id == id) {
+                        t.name = new_name.to_string();
+                        self.dataset_dirty = true;
+                        return Task::perform(async move { () }, |_| Message::SaveDataset);
+                    }
                 }
                 Task::none()
             }
@@ -699,20 +702,20 @@ impl App {
         }
 
         // --- Sidebar: templates + history (Postman-like left panel) ---
-        let templates = TemplateList::new(&self.dataset)
-            .selected(self.selected_template)
+        let collections = CollectionView::new(&self.dataset)
+            .selected(self.selected_request)
             .height(Length::Fixed(360.0))
             .view();
 
         let history = self.view_history_inline();
 
         let sidebar = column![
-            Section::new("Templates", templates).into_element(),
+            Section::new("Collections", collections).into_element(),
             Section::new("History", history).into_element(),
             row![
-                button(text("New Template").size(14))
+                button(text("New Request").size(14))
                     .padding(10)
-                    .on_press(Message::NewTemplatePressed),
+                    .on_press(Message::NewRequestPressed),
                 Space::new().width(Length::Fill),
                 button(text("Clear History").size(14))
                     .padding(10)
@@ -730,7 +733,7 @@ impl App {
             &self.request.url,
             &self.headers_text,
             &self.body_editor,
-            &self.template_name_input,
+            &self.request_name_input,
         )
         .autosave_enabled(self.app_config.autosave_enabled)
         .dataset_dirty(self.dataset_dirty)
@@ -858,7 +861,7 @@ impl App {
             url: self.request.url.clone(),
             headers_text: self.headers_text.clone(),
             body_text: self.body_editor.text(),
-            template_name: self.template_name_input.clone(),
+            request_name: self.request_name_input.clone(),
         }
     }
 
@@ -867,7 +870,7 @@ impl App {
         // If a template is selected, apply editor state into it right away.
         // If parsing fails, surface error and do not mutate.
         let draft = self.editor_draft();
-        match apply_editor_to_selected_template(&mut self.dataset, self.selected_template, &draft) {
+        match apply_editor_to_selected_request(&mut self.dataset, self.selected_request, &draft) {
             Ok(updated) => {
                 if updated {
                     self.dataset_dirty = true;

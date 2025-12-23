@@ -1,18 +1,6 @@
-/// Dataset <-> editor synchronization helpers.
-///
-/// Goal:
-/// - When a template is selected, any editor change (method/url/headers/body/name)
-///   immediately mutates that template in-memory.
-/// - The GUI layer can then autosave (debounced) by simply persisting the dataset.
-///
-/// This module keeps `gui/app.rs` lean by centralizing:
-/// - parsing/formatting headers text
-/// - applying editor state to the selected template
-/// - loading a template into the editor UI state
-///
-/// NOTE: Keep this module free of any Iced types so it is testable and reusable.
 use crate::models::{HeaderEntry, HttpMethod};
-use crate::persist::{Dataset, DatasetId, RequestTemplate};
+use crate::persist::dataset::Collection;
+use crate::persist::{Dataset, DatasetId, Request};
 
 #[derive(Debug, Clone)]
 pub enum DatasetUiState {
@@ -23,7 +11,7 @@ pub enum DatasetUiState {
 
 /// A snapshot of the current request editor UI state.
 ///
-/// This is the “draft” that can be applied to a selected `RequestTemplate`.
+/// This is the “draft” that can be applied to a selected `Request`.
 #[derive(Debug, Clone, Default)]
 pub struct EditorDraft {
     pub method: HttpMethod,
@@ -32,8 +20,8 @@ pub struct EditorDraft {
     pub headers_text: String,
     /// Raw request body editor text.
     pub body_text: String,
-    /// Optional name field for the template.
-    pub template_name: String,
+    /// Optional name field for the request.
+    pub request_name: String,
 }
 
 impl EditorDraft {
@@ -47,61 +35,91 @@ impl EditorDraft {
     }
 }
 
-/// Ensure there is at least one template in the dataset.
+/// Ensure there is at least one request in the dataset.
 ///
-/// Returns `true` if a template was added.
-pub fn ensure_default_template_exists(dataset: &mut Dataset) -> bool {
-    if !dataset.templates.is_empty() {
-        return false;
+/// Returns `true` if a request was added.
+pub fn ensure_default_request_exists(dataset: &mut Dataset) -> bool {
+    if dataset.collections.is_empty() {
+        let next_id = dataset.next_id();
+        let mut new_collection = Collection {
+            id: next_id,
+            name: "My Collection".to_string(),
+            requests: Vec::new(),
+        };
+        new_collection.requests.push(Request::new(
+            dataset.next_id(),
+            "Default",
+            HttpMethod::Get,
+            "https://example.com",
+        ));
+        dataset.collections.push(new_collection);
+        return true;
     }
 
-    let id = dataset.next_id();
-    dataset.templates.push(RequestTemplate::new(
-        id,
-        "Default",
-        HttpMethod::Get,
-        "https://example.com",
-    ));
-    true
+    if dataset.collections.iter().all(|c| c.requests.is_empty()) {
+        let next_id = dataset.next_id();
+        if let Some(collection) = dataset.collections.first_mut() {
+            collection.requests.push(Request::new(
+                next_id,
+                "Default",
+                HttpMethod::Get,
+                "https://example.com",
+            ));
+            return true;
+        }
+    }
+
+    false
 }
 
-/// Load a template into an editor draft.
+/// Load a request into an editor draft.
 ///
-/// Returns `None` if the template is not found.
-pub fn load_template_into_editor(dataset: &Dataset, id: DatasetId) -> Option<EditorDraft> {
-    let t = dataset.templates.iter().find(|t| t.id == id)?;
-
-    Some(EditorDraft {
-        method: t.method,
-        url: t.url.clone(),
-        headers_text: headers_to_text(&t.headers),
-        body_text: t.body.clone().unwrap_or_default(),
-        template_name: t.name.clone(),
-    })
+/// Returns `None` if the request is not found.
+pub fn load_request_into_editor(dataset: &Dataset, id: DatasetId) -> Option<EditorDraft> {
+    for collection in &dataset.collections {
+        if let Some(t) = collection.requests.iter().find(|t| t.id == id) {
+            return Some(EditorDraft {
+                method: t.method,
+                url: t.url.clone(),
+                headers_text: headers_to_text(&t.headers),
+                body_text: t.body.clone().unwrap_or_default(),
+                request_name: t.name.clone(),
+            });
+        }
+    }
+    None
 }
 
-/// Apply the current editor draft into the selected template *immediately*.
+/// Apply the current editor draft into the selected request *immediately*.
 ///
 /// This is the core “immediate mutation” feature:
-/// - If `selected_template` exists, we update that template in-place from the editor draft.
+/// - If `selected_request` exists, we update that request in-place from the editor draft.
 /// - If parsing headers fails, we return an error and do not mutate.
-/// - If the template name is empty, we keep the existing name (so you can edit request fields
+/// - If the request name is empty, we keep the existing name (so you can edit request fields
 ///   without being forced to rename).
 ///
 /// Returns:
-/// - `Ok(true)` if a template was updated
-/// - `Ok(false)` if no template was selected or found
+/// - `Ok(true)` if a request was updated
+/// - `Ok(false)` if no request was selected or found
 /// - `Err(msg)` if headers parsing failed
-pub fn apply_editor_to_selected_template(
+pub fn apply_editor_to_selected_request(
     dataset: &mut Dataset,
-    selected_template: Option<DatasetId>,
+    selected_request: Option<DatasetId>,
     draft: &EditorDraft,
 ) -> Result<bool, String> {
-    let Some(id) = selected_template else {
+    let Some(id) = selected_request else {
         return Ok(false);
     };
 
-    let Some(existing) = dataset.templates.iter().find(|t| t.id == id).cloned() else {
+    let mut existing_request = None;
+    for collection in &dataset.collections {
+        if let Some(request) = collection.requests.iter().find(|t: &&Request| t.id == id) {
+            existing_request = Some(request.clone());
+            break;
+        }
+    }
+
+    let Some(existing) = existing_request else {
         return Ok(false);
     };
 
@@ -109,7 +127,7 @@ pub fn apply_editor_to_selected_template(
 
     let mut t = existing;
 
-    let name = draft.template_name.trim();
+    let name = draft.request_name.trim();
     if !name.is_empty() {
         t.name = name.to_string();
     }
@@ -140,7 +158,7 @@ pub fn parse_headers(raw: &str) -> Result<Vec<HeaderEntry>, String> {
 
         let Some((name, value)) = line.split_once(':') else {
             return Err(format!(
-                "Invalid header on line {} (expected `Name: Value`): {line}",
+                "Invalid header on line {} (expected `Name: Value`): {{line}}",
                 line_no + 1
             ));
         };

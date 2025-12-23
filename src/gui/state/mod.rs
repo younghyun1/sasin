@@ -8,6 +8,6 @@
 pub mod dataset_sync;
 
 pub use dataset_sync::{
-    DatasetUiState, EditorDraft, apply_editor_to_selected_template, ensure_default_template_exists,
-    headers_to_text, load_template_into_editor, parse_headers,
+    DatasetUiState, EditorDraft, apply_editor_to_selected_request, ensure_default_request_exists,
+    headers_to_text, load_request_into_editor, parse_headers,
 };

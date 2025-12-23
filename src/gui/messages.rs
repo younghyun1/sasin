@@ -93,23 +93,23 @@ pub enum Message {
     ///
     /// This supports the "immediate mutation" workflow: if no template is selected,
     /// the user can create one, then further edits mutate it immediately.
-    NewTemplatePressed,
+    NewRequestPressed,
 
     /// User edited the template name draft in the editor.
     ///
     /// If a template is selected, this will typically rename it (immediate mutation).
     /// If no template is selected, this updates the draft name for the next "New Template".
-    TemplateNameChanged(String),
+    RequestNameChanged(String),
 
     /// Create/update a named request template in the dataset from current editor state.
-    SaveTemplatePressed,
+    SaveRequestPressed,
 
     /// Rename a template.
-    RenameTemplatePressed(u64, String),
+    RenameRequestPressed(u64, String),
 
     /// Delete a template from the dataset.
-    DeleteTemplatePressed(u64),
+    DeleteRequestPressed(u64),
 
     /// Select a template from the dataset to load into the editor.
-    TemplateSelected(u64),
+    RequestSelected(u64),
 }

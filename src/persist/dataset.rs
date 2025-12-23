@@ -14,7 +14,7 @@ pub type DatasetId = u64;
 
 /// One saved request template ("tab" in Postman terms).
 #[derive(Debug, Clone, Encode, Decode)]
-pub struct RequestTemplate {
+pub struct Request {
     pub id: DatasetId,
     pub name: String,
     pub method: HttpMethod,
@@ -25,11 +25,18 @@ pub struct RequestTemplate {
     pub updated_at_unix_ms: u64,
 }
 
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct Collection {
+    pub id: DatasetId,
+    pub name: String,
+    pub requests: Vec<Request>,
+}
+
 /// Stored payload schema (versioned).
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct Dataset {
     pub version: u32,
-    pub templates: Vec<RequestTemplate>,
+    pub collections: Vec<Collection>,
     /// Arbitrary user metadata (e.g. environment, notes).
     pub meta: BTreeMap<String, String>,
 }
@@ -38,44 +45,69 @@ impl Default for Dataset {
     fn default() -> Self {
         Self {
             version: DatasetFile::FORMAT_VERSION,
-            templates: Vec::new(),
+            collections: Vec::new(),
             meta: BTreeMap::new(),
         }
     }
 }
 
 impl Dataset {
-    pub fn upsert(&mut self, mut template: RequestTemplate) {
+    pub fn upsert(&mut self, mut template: Request) {
         let now = now_unix_ms();
         if template.created_at_unix_ms == 0 {
             template.created_at_unix_ms = now;
         }
         template.updated_at_unix_ms = now;
 
-        if let Some(existing) = self.templates.iter_mut().find(|t| t.id == template.id) {
-            *existing = template;
+        for collection in &mut self.collections {
+            if let Some(existing) = collection.requests.iter_mut().find(|t| t.id == template.id) {
+                *existing = template;
+                return;
+            }
+        }
+
+        // If the request is not found, we need to decide where to put it.
+        // For now, let's assume the first collection is the default.
+        if let Some(collection) = self.collections.first_mut() {
+            collection.requests.push(template);
         } else {
-            self.templates.push(template);
+            // Or create a new collection if none exist
+            let new_collection = Collection {
+                id: self.next_id(),
+                name: "My Collection".to_string(),
+                requests: vec![template],
+            };
+            self.collections.push(new_collection);
         }
     }
 
     pub fn remove(&mut self, id: DatasetId) -> bool {
-        let before = self.templates.len();
-        self.templates.retain(|t| t.id != id);
-        before != self.templates.len()
+        for collection in &mut self.collections {
+            let before = collection.requests.len();
+            collection.requests.retain(|t| t.id != id);
+            if before != collection.requests.len() {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn next_id(&self) -> DatasetId {
-        self.templates
+        let max_request_id = self
+            .collections
             .iter()
-            .map(|t| t.id)
+            .flat_map(|c| c.requests.iter())
+            .map(|r| r.id)
             .max()
-            .unwrap_or(0)
-            .saturating_add(1)
+            .unwrap_or(0);
+
+        let max_collection_id = self.collections.iter().map(|c| c.id).max().unwrap_or(0);
+
+        max_request_id.max(max_collection_id).saturating_add(1)
     }
 }
 
-impl RequestTemplate {
+impl Request {
     pub fn new(
         id: DatasetId,
         name: impl Into<String>,
@@ -113,7 +145,7 @@ pub struct DatasetFile {
 
 impl DatasetFile {
     pub const MAGIC: [u8; 8] = *b"SASINDS1";
-    pub const FORMAT_VERSION: u32 = 1;
+    pub const FORMAT_VERSION: u32 = 2; // Incremented version
 
     /// Default zstd compression level: reasonably fast and small.
     pub const DEFAULT_ZSTD_LEVEL: i32 = 3;
@@ -140,7 +172,21 @@ impl DatasetFile {
     /// Read and decode the dataset file from disk.
     pub fn load(&self) -> PersistResult<Dataset> {
         let bytes = fs::read(&self.path).map_err(|e| PersistError::Io(self.path.clone(), e))?;
-        decode_dataset_file(&bytes).map_err(|e| e.with_path(self.path.clone()))
+        decode_dataset_file(&bytes)
+            .map_err(|e| e.with_path(self.path.clone()))
+            .and_then(|(dataset, version)| {
+                if version < Self::FORMAT_VERSION {
+                    // Here you would implement migration logic.
+                    // For now, we'll just wrap the old templates in a collection.
+                    let migrated_dataset = Dataset {
+                        version: Self::FORMAT_VERSION,
+                        ..dataset
+                    };
+                    Ok(migrated_dataset)
+                } else {
+                    Ok(dataset)
+                }
+            })
     }
 
     /// Save the dataset to disk (atomic write).
@@ -242,8 +288,7 @@ fn encode_dataset_file(dataset: &Dataset, zstd_level: i32) -> PersistResult<Vec<
     Ok(out)
 }
 
-fn decode_dataset_file(bytes: &[u8]) -> PersistResult<Dataset> {
-    // header: 8 + 4 + 4
+fn decode_dataset_file(bytes: &[u8]) -> PersistResult<(Dataset, u32)> {
     if bytes.len() < 16 {
         return Err(PersistError::InvalidFormat {
             path: None,
@@ -260,24 +305,39 @@ fn decode_dataset_file(bytes: &[u8]) -> PersistResult<Dataset> {
     }
 
     let ver = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
-    if ver != DatasetFile::FORMAT_VERSION {
-        return Err(PersistError::UnsupportedVersion {
-            path: None,
-            version: ver,
-        });
-    }
 
-    // zstd level stored for debugging; not required for decode.
     let _zstd_level = i32::from_le_bytes(bytes[12..16].try_into().unwrap());
 
     let compressed = &bytes[16..];
     let decompressed = zstd::stream::decode_all(compressed)
         .map_err(|e| PersistError::Decompress(e.to_string()))?;
 
+    if ver == 1 {
+        // Old format, decode as such
+        #[derive(Debug, Clone, Encode, Decode)]
+        struct OldDataset {
+            pub version: u32,
+            pub templates: Vec<Request>,
+            pub meta: BTreeMap<String, String>,
+        }
+        let old_dataset: OldDataset =
+            bitcode::decode(&decompressed).map_err(|e| PersistError::Decode(e.to_string()))?;
+        let new_dataset = Dataset {
+            version: 2,
+            collections: vec![Collection {
+                id: 1, // Or generate a new one
+                name: "My Collection".to_string(),
+                requests: old_dataset.templates,
+            }],
+            meta: old_dataset.meta,
+        };
+        return Ok((new_dataset, ver));
+    }
+
     let dataset: Dataset =
         bitcode::decode(&decompressed).map_err(|e| PersistError::Decode(e.to_string()))?;
 
-    Ok(dataset)
+    Ok((dataset, ver))
 }
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -300,7 +360,6 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> io::Result<()> {
         f.sync_all()?;
     }
 
-    // On Windows, rename over existing can fail; remove first.
     if path.exists() {
         let _ = fs::remove_file(path);
     }
