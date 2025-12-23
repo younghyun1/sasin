@@ -1,10 +1,8 @@
-use iced::alignment::Vertical;
-use iced::widget::{
-    Space, button, column, container, pick_list, row, scrollable, text, text_editor, text_input,
-};
+use iced::widget::{Space, button, column, container, row, text, text_editor};
 use iced::{Element, Length, Task};
 
 use crate::gui::Message;
+use crate::gui::components::{RequestEditor, ResponseView, Section, TemplateList};
 use crate::gui::state::{
     EditorDraft, apply_editor_to_selected_template, load_template_into_editor,
 };
@@ -183,8 +181,26 @@ impl App {
 
                 let draft = self.editor_draft();
                 let name = draft.template_name.trim();
+
+                // Default name: "<METHOD> <host>" (or "<METHOD> <url>" as fallback).
+                // If URL is not parseable, keep it simple and still deterministic.
+                let default_name = match draft.url.parse::<reqwest::Url>() {
+                    Ok(u) => {
+                        let host = u.host_str().unwrap_or("unknown-host");
+                        format!("{} {}", draft.method.as_str(), host)
+                    }
+                    Err(_) => {
+                        let url = draft.url.trim();
+                        if url.is_empty() {
+                            format!("{} request", draft.method.as_str())
+                        } else {
+                            format!("{} {}", draft.method.as_str(), url)
+                        }
+                    }
+                };
+
                 let template_name = if name.is_empty() {
-                    format!("Request {id}")
+                    default_name
                 } else {
                     name.to_string()
                 };
@@ -640,11 +656,59 @@ impl App {
             }
         }
 
-        let left = self.view_request_panel();
-        let right = self.view_response_panel();
+        // --- Left side: request editor + templates + history (components) ---
+        let request_editor = RequestEditor::new(
+            self.request.method,
+            &self.request.url,
+            &self.headers_text,
+            &self.body_editor,
+            &self.template_name_input,
+        )
+        .autosave_enabled(self.app_config.autosave_enabled)
+        .dataset_dirty(self.dataset_dirty)
+        .sending(self.sending)
+        .headers_height_px(110.0)
+        .body_height_px(260.0)
+        .view();
+
+        let templates = TemplateList::new(&self.dataset)
+            .selected(self.selected_template)
+            .height(Length::Fixed(240.0))
+            .view();
+
+        // HistoryList component requires borrowing a slice that outlives this `view` call.
+        // To avoid borrowing a temporary Vec, render history inline here for now.
+        let history = self.view_history_inline();
+
+        let left = column![
+            Section::untitled(request_editor).into_element(),
+            Section::new("Templates", templates).into_element(),
+            Section::new("History", history).into_element(),
+            button(text("Clear History").size(14))
+                .padding(10)
+                .on_press(Message::ClearHistory)
+        ]
+        .spacing(12.0)
+        .width(Length::FillPortion(1))
+        .height(Length::Fill);
+
+        // --- Right side: response (component) ---
+        // ResponseView::body_text takes a borrowed &str; avoid borrowing a temporary String by not
+        // passing a formatted body here. The view will fall back to the raw response body.
+        let response_view = ResponseView::new()
+            .response(self.response.as_ref())
+            .error(self.error.as_deref())
+            .show_headers(self.show_headers)
+            .pretty_json(self.pretty_json)
+            .body_text(None)
+            .view();
+
+        let right = Section::untitled(response_view)
+            .width(Length::FillPortion(1))
+            .into_element();
 
         let content = row![left, right]
-            .spacing(14)
+            .spacing(14.0)
             .padding(14)
             .width(Length::Fill)
             .height(Length::Fill);
@@ -652,207 +716,6 @@ impl App {
         container(content)
             .width(Length::Fill)
             .height(Length::Fill)
-            .into()
-    }
-
-    fn view_request_panel(&self) -> Element<'_, Message> {
-        let top = self.view_top_bar();
-
-        let section_gap = || Space::new().height(Length::Fixed(10.0));
-
-        let headers_input = text_input(
-            "Header: Value (one per line). Example: Accept: application/json",
-            &self.headers_text,
-        )
-        .on_input(Message::HeadersChanged)
-        .padding(12)
-        .size(14)
-        .width(Length::Fill);
-
-        // Make body a fixed-height box (text_editor has internal scrolling),
-        // so it looks like a complete editor "card" in the UI.
-        let body_box = text_editor(&self.body_editor)
-            .placeholder("Request body (raw text)…")
-            .on_action(|action| {
-                let mut content = self.body_editor.clone();
-                content.perform(action);
-                Message::BodyChanged(content.text())
-            })
-            .height(260.0);
-
-        let cancel_btn = button(text("Cancel").size(14))
-            .padding(10)
-            .on_press_maybe(self.sending.then_some(Message::CancelPressed));
-
-        let clear_btn = button(text("Clear Output").size(14))
-            .padding(10)
-            .on_press(Message::ClearPressed);
-
-        let save_template_btn = button(text("Save Template").size(14))
-            .padding(10)
-            .on_press(Message::SaveTemplatePressed);
-
-        let save_dataset_btn = button(text("Save Dataset").size(14))
-            .padding(10)
-            .on_press(Message::SaveDataset);
-
-        let clear_hist_btn = button(text("Clear History").size(14))
-            .padding(10)
-            .on_press(Message::ClearHistory);
-
-        let history = self.view_history();
-        let templates = self.view_templates();
-
-        let template_name = text_input("Template name…", &self.template_name_input)
-            .on_input(Message::TemplateNameChanged)
-            .padding(12)
-            .size(14)
-            .width(Length::Fill);
-
-        let autosave_label = if self.app_config.autosave_enabled {
-            "Autosave: On"
-        } else {
-            "Autosave: Off"
-        };
-
-        let content = column![
-            top,
-            section_gap(),
-            row![text("Dataset").size(16),]
-                .spacing(10)
-                .align_y(Vertical::Center),
-            row![
-                button(text("Open…").size(14))
-                    .padding(10)
-                    .on_press(Message::OpenDatasetPressed),
-                button(text("Save As…").size(14))
-                    .padding(10)
-                    .on_press(Message::SaveDatasetAsPressed),
-                button(text("New Template").size(14))
-                    .padding(10)
-                    .on_press(Message::NewTemplatePressed),
-                button(text(autosave_label).size(14))
-                    .padding(10)
-                    .on_press(Message::ToggleAutosave),
-            ]
-            .spacing(10)
-            .align_y(Vertical::Center),
-            section_gap(),
-            text("Templates").size(16),
-            templates,
-            section_gap(),
-            text("Template Name").size(16),
-            template_name,
-            section_gap(),
-            text("Headers").size(16),
-            headers_input,
-            section_gap(),
-            text("Body").size(16),
-            body_box,
-            section_gap(),
-            row![cancel_btn, clear_btn, save_template_btn, save_dataset_btn]
-                .spacing(10)
-                .align_y(Vertical::Center),
-            Space::new().height(Length::Fixed(14.0)),
-            text("History").size(16),
-            history,
-            Space::new().height(Length::Fixed(6.0)),
-            row![clear_hist_btn].spacing(10),
-        ]
-        .spacing(10)
-        .width(Length::FillPortion(1))
-        .height(Length::Fill);
-
-        container(content)
-            .padding(14)
-            .width(Length::FillPortion(1))
-            .height(Length::Fill)
-            .into()
-    }
-
-    fn view_top_bar(&self) -> Element<'_, Message> {
-        let method_dropdown = pick_list(
-            HttpMethod::all(),
-            Some(self.request.method),
-            Message::MethodChanged,
-        )
-        .padding(10);
-
-        let url_input = text_input("https://example.com", &self.request.url)
-            .on_input(Message::UrlChanged)
-            .padding(12)
-            .size(16)
-            .width(Length::Fill);
-
-        let send_label = if self.sending { "Sending…" } else { "Send" };
-        let send_btn = button(text(send_label).size(16))
-            .padding(12)
-            .on_press_maybe((!self.sending).then_some(Message::SendPressed));
-
-        row![method_dropdown, url_input, send_btn]
-            .spacing(12)
-            .align_y(Vertical::Center)
-            .into()
-    }
-
-    fn view_history(&self) -> Element<'_, Message> {
-        if self.history.is_empty() {
-            return container(text("No history yet.").size(14))
-                .padding(10)
-                .width(Length::Fill)
-                .into();
-        }
-
-        let mut col = column!().spacing(8).width(Length::Fill);
-
-        for (idx, h) in self.history.iter().enumerate() {
-            let label = format!("{} {}", h.method.as_str(), h.url);
-
-            let mut b = button(text(label).size(13)).padding(10);
-
-            if self.selected_history != Some(idx) {
-                b = b.on_press(Message::HistorySelected(idx));
-            }
-
-            col = col.push(b);
-        }
-
-        scrollable(col)
-            .height(Length::Fixed(200.0))
-            .width(Length::Fill)
-            .into()
-    }
-
-    fn view_templates(&self) -> Element<'_, Message> {
-        if self.dataset.templates.is_empty() {
-            return container(text("No templates saved yet.").size(14))
-                .padding(10)
-                .width(Length::Fill)
-                .into();
-        }
-
-        let mut col = column!().spacing(8).width(Length::Fill);
-
-        for t in &self.dataset.templates {
-            let label = format!("{} • {} {}", t.name, t.method.as_str(), t.url);
-            let mut b = button(text(label).size(13)).padding(10);
-            if self.selected_template != Some(t.id) {
-                b = b.on_press(Message::TemplateSelected(t.id));
-            }
-            col = col.push(
-                row![
-                    b,
-                    button(text("Del").size(12))
-                        .padding(8)
-                        .on_press(Message::DeleteTemplatePressed(t.id))
-                ]
-                .spacing(8),
-            );
-        }
-
-        scrollable(col)
-            .height(Length::Fixed(220.0))
-            .width(Length::Fill)
             .into()
     }
 
@@ -901,144 +764,32 @@ impl App {
             .into()
     }
 
-    fn view_response_panel(&self) -> Element<'_, Message> {
-        let pretty_btn = button(text(if self.pretty_json {
-            "Pretty JSON: on"
-        } else {
-            "Pretty JSON: off"
-        }))
-        .padding(8)
-        .on_press(Message::TogglePrettyJson);
-
-        let headers_btn = button(text(if self.show_headers {
-            "Show headers: on"
-        } else {
-            "Show headers: off"
-        }))
-        .padding(8)
-        .on_press(Message::ToggleShowHeaders);
-
-        let options = row![pretty_btn, headers_btn]
-            .spacing(8)
-            .align_y(Vertical::Center);
-
-        let body = self.view_response_area();
-
-        let content = column![
-            row![text("Response").size(18),].align_y(Vertical::Center),
-            options,
-            body
-        ]
-        .spacing(10)
-        .width(Length::FillPortion(1))
-        .height(Length::Fill);
-
-        container(content)
-            .width(Length::FillPortion(1))
-            .height(Length::Fill)
-            .into()
-    }
-
-    fn view_response_area(&self) -> Element<'_, Message> {
-        if let Some(err) = &self.error {
-            return container(
-                column![
-                    text("Error").size(16),
-                    Space::new().height(Length::Fixed(4.0)),
-                    text(err).size(14),
-                ]
-                .spacing(6),
-            )
-            .padding(12)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into();
+    /// Inline history rendering that only borrows from `self`.
+    ///
+    /// This avoids building a temporary `Vec` inside `view()` that would be dropped
+    /// before the returned `Element` is used.
+    fn view_history_inline(&self) -> Element<'_, Message> {
+        if self.history.is_empty() {
+            return text("No history yet.").size(14).into();
         }
 
-        if let Some(resp) = &self.response {
-            // Response stats: duration uses `:?` formatting.
-            let stats = format!(
-                "Status: {} {} • Duration: {:?} • Body: {} bytes",
-                resp.status.code,
-                resp.status.reason,
-                resp.duration,
-                resp.body.len()
-            );
+        let mut col = column!().spacing(8.0).width(Length::Fill);
 
-            let headers_block = if self.show_headers {
-                let mut s = String::new();
-                for (name, value) in resp.headers.iter() {
-                    let value_str = value.to_str().unwrap_or("<non-utf8>");
-                    s.push_str(name.as_str());
-                    s.push_str(": ");
-                    s.push_str(value_str);
-                    s.push('\n');
-                }
-                if s.is_empty() {
-                    "<no headers>".to_string()
-                } else {
-                    s
-                }
-            } else {
-                String::new()
-            };
+        for (idx, h) in self.history.iter().enumerate() {
+            let label = format!("{} {}", h.method.as_str(), h.url);
 
-            let body_text = format_response_body(&resp.body, self.pretty_json);
+            let mut b = button(text(label).size(13)).padding(10);
 
-            let mut panel = column![text(stats).size(14)]
-                .spacing(8)
-                .width(Length::Fill)
-                .height(Length::Fill);
-
-            if self.show_headers {
-                panel = panel.push(text("Headers").size(16)).push(
-                    scrollable(text(headers_block).size(12))
-                        .height(Length::Fixed(160.0))
-                        .width(Length::Fill),
-                );
+            if self.selected_history != Some(idx) {
+                b = b.on_press(Message::HistorySelected(idx));
             }
 
-            panel = panel.push(text("Body").size(16)).push(
-                scrollable(text(body_text).size(12))
-                    .height(Length::Fill)
-                    .width(Length::Fill),
-            );
-
-            return container(panel)
-                .padding(12)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into();
+            col = col.push(b);
         }
 
-        container(
-            column![
-                text("Ready").size(18),
-                text("Enter a URL, pick a method, edit headers/body, and press Send.").size(14),
-            ]
-            .spacing(6),
-        )
-        .padding(12)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
-    }
-}
-
-fn format_response_body(body: &str, pretty_json: bool) -> String {
-    if !pretty_json {
-        return body.to_string();
+        container(col).width(Length::Fill).into()
     }
 
-    // Best-effort JSON pretty print.
-    // If it fails, fall back to the original body unchanged.
-    match serde_json::from_str::<serde_json::Value>(body) {
-        Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_else(|_| body.to_string()),
-        Err(_) => body.to_string(),
-    }
-}
-
-impl App {
     fn mark_dataset_dirty_from_editor_change(&mut self) {
         if matches!(self.dataset_ui, DatasetUiState::Ready { .. }) {
             self.dataset_dirty = true;
