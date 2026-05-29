@@ -1,7 +1,15 @@
-/// HTTP layer: thin wrapper around `reqwest`.
-///
-/// Kept deliberately small and testable. The GUI should call into this module
-/// instead of using `reqwest` directly.
-pub mod client;
+//! HTTP layer: build and execute requests from the workspace model.
+//!
+//! The GUI calls [`execute`] with a resolved [`HttpRequest`](crate::model::HttpRequest); this
+//! module owns all `reqwest` usage (client construction, auth, body encoding).
 
-pub use client::{HttpClientConfig, send};
+pub mod auth;
+pub mod body;
+pub mod client;
+pub mod exec;
+
+#[cfg(test)]
+mod tests;
+
+pub use client::HttpClientConfig;
+pub use exec::execute;

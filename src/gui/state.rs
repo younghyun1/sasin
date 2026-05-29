@@ -3,7 +3,7 @@
 use iced::widget::text_editor;
 
 use crate::model::{Body, KvEntry, Node, NodePath, RawLang};
-use crate::models::{HeaderEntry, HttpMethod, RequestModel, ResponseModel};
+use crate::models::{HttpMethod, ResponseModel};
 
 /// What a tab is editing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,26 +147,6 @@ pub fn apply_tab_to_node(tab: &Tab, node: &mut Node) -> Result<(), String> {
         Node::Folder(_) => {}
     }
     Ok(())
-}
-
-/// Build a runtime request model from a tab for sending (no variable interpolation yet — P4).
-pub fn build_request_model(tab: &Tab) -> Result<RequestModel, String> {
-    let headers = parse_header_lines(&tab.headers_text)?
-        .into_iter()
-        .map(|(name, value)| HeaderEntry { name, value })
-        .collect();
-    let body_text = tab.body.text();
-    let body = if body_text.trim().is_empty() {
-        None
-    } else {
-        Some(body_text)
-    };
-    Ok(RequestModel {
-        method: tab.method,
-        url: tab.url.clone(),
-        headers,
-        body,
-    })
 }
 
 /// Parse `Name: Value` lines. Blank lines and `#` comments are ignored.

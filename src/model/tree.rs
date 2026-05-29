@@ -110,6 +110,30 @@ pub fn find_node_mut<'a>(roots: &'a mut [Node], path: &[String]) -> Option<&'a m
     }
 }
 
+/// Resolve the effective auth for the node at `path`: the node's own auth if it is not
+/// [`Auth::Inherit`], otherwise the nearest ancestor folder's auth, otherwise [`Auth::None`].
+pub fn resolve_auth(roots: &[Node], path: &[String]) -> Auth {
+    if let Some(node) = find_node(roots, path) {
+        let own = match node {
+            Node::Folder(f) => &f.auth,
+            Node::Http(r) => &r.auth,
+            Node::Ws(w) => &w.auth,
+        };
+        if !own.is_inherit() {
+            return own.clone();
+        }
+    }
+    // Walk ancestor folders, deepest first.
+    for len in (1..path.len()).rev() {
+        if let Some(Node::Folder(f)) = find_node(roots, &path[..len])
+            && !f.auth.is_inherit()
+        {
+            return f.auth.clone();
+        }
+    }
+    Auth::None
+}
+
 /// Remove and return the node at `path`, if present.
 pub fn remove_node(roots: &mut Vec<Node>, path: &[String]) -> Option<Node> {
     let (first, rest) = path.split_first()?;

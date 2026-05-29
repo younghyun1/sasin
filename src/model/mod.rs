@@ -27,6 +27,6 @@ pub use kv::KvEntry;
 pub use request::HttpRequest;
 pub use scripts::Scripts;
 pub use settings::{Settings, WsSettings};
-pub use tree::{Folder, Node, NodePath, find_node, find_node_mut, remove_node};
+pub use tree::{Folder, Node, NodePath, find_node, find_node_mut, remove_node, resolve_auth};
 pub use websocket::{WsKind, WsMessageTemplate, WsRequest};
 pub use workspace::{Workspace, WorkspaceDefaults, WorkspaceManifest};
