@@ -158,7 +158,7 @@ pub fn parse_headers(raw: &str) -> Result<Vec<HeaderEntry>, String> {
 
         let Some((name, value)) = line.split_once(':') else {
             return Err(format!(
-                "Invalid header on line {} (expected `Name: Value`): {{line}}",
+                "Invalid header on line {} (expected `Name: Value`): {line}",
                 line_no + 1
             ));
         };

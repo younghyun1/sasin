@@ -1,4 +1,3 @@
-#![feature(const_type_name)]
 #![windows_subsystem = "windows"]
 
 use crate::setup_logger::setup_logger;

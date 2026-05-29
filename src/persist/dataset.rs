@@ -174,17 +174,17 @@ impl DatasetFile {
         let bytes = fs::read(&self.path).map_err(|e| PersistError::Io(self.path.clone(), e))?;
         decode_dataset_file(&bytes)
             .map_err(|e| e.with_path(self.path.clone()))
-            .and_then(|(dataset, version)| {
+            .map(|(dataset, version)| {
                 if version < Self::FORMAT_VERSION {
                     // Here you would implement migration logic.
                     // For now, we'll just wrap the old templates in a collection.
-                    let migrated_dataset = Dataset {
+
+                    Dataset {
                         version: Self::FORMAT_VERSION,
                         ..dataset
-                    };
-                    Ok(migrated_dataset)
+                    }
                 } else {
-                    Ok(dataset)
+                    dataset
                 }
             })
     }
@@ -283,7 +283,7 @@ fn encode_dataset_file(dataset: &Dataset, zstd_level: i32) -> PersistResult<Vec<
     let mut out = Vec::with_capacity(8 + 4 + 4 + compressed.len());
     out.extend_from_slice(&DatasetFile::MAGIC);
     out.extend_from_slice(&DatasetFile::FORMAT_VERSION.to_le_bytes());
-    out.extend_from_slice(&(zstd_level as i32).to_le_bytes());
+    out.extend_from_slice(&zstd_level.to_le_bytes());
     out.extend_from_slice(&compressed);
     Ok(out)
 }

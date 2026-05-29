@@ -119,7 +119,7 @@ impl App {
             ),
         };
 
-        let layout = cfg.layout.unwrap_or(LayoutState::default());
+        let layout = cfg.layout.unwrap_or_default();
 
         Self {
             request: RequestModel::default(),
@@ -179,7 +179,7 @@ impl App {
                 let cfg_path = self.config_path.clone();
                 let cfg = self.app_config.clone();
 
-                return Task::perform(
+                Task::perform(
                     async move {
                         let f = AppConfigFile::new(cfg_path);
                         f.save(&cfg).map_err(|e: ConfigError| e.to_string())
@@ -188,29 +188,29 @@ impl App {
                         Ok(_) => Message::ClearPressed,
                         Err(e) => Message::RequestFailed(0, e),
                     },
-                );
+                )
             }
 
             Message::MethodChanged(method) => {
                 self.request.method = method;
-                return self.apply_editor_mutation_and_maybe_autosave();
+                self.apply_editor_mutation_and_maybe_autosave()
             }
             Message::UrlChanged(url) => {
                 self.request.url = url;
-                return self.apply_editor_mutation_and_maybe_autosave();
+                self.apply_editor_mutation_and_maybe_autosave()
             }
             Message::HeadersChanged(s) => {
                 self.headers_text = s;
-                return self.apply_editor_mutation_and_maybe_autosave();
+                self.apply_editor_mutation_and_maybe_autosave()
             }
             Message::BodyChanged(s) => {
                 self.body_editor = text_editor::Content::with_text(&s);
-                return self.apply_editor_mutation_and_maybe_autosave();
+                self.apply_editor_mutation_and_maybe_autosave()
             }
 
             Message::RequestNameChanged(name) => {
                 self.request_name_input = name;
-                return self.apply_editor_mutation_and_maybe_autosave();
+                self.apply_editor_mutation_and_maybe_autosave()
             }
 
             Message::NewRequestPressed => {
@@ -262,7 +262,7 @@ impl App {
                 self.selected_request = Some(id);
                 self.dataset_dirty = true;
 
-                return self.mark_dirty_and_maybe_schedule_autosave();
+                self.mark_dirty_and_maybe_schedule_autosave()
             }
 
             Message::TogglePrettyJson => {
@@ -279,7 +279,7 @@ impl App {
                 // Persist config immediately
                 let cfg_path = self.config_path.clone();
                 let cfg = self.app_config.clone();
-                return Task::perform(
+                Task::perform(
                     async move {
                         let f = AppConfigFile::new(cfg_path);
                         f.save(&cfg).map_err(|e: ConfigError| e.to_string())
@@ -288,7 +288,7 @@ impl App {
                         Ok(_) => Message::ClearPressed,
                         Err(e) => Message::RequestFailed(0, e),
                     },
-                );
+                )
             }
             Message::AutosaveTick => {
                 self.autosave_pending = false;
@@ -297,7 +297,7 @@ impl App {
                     return Task::none();
                 }
 
-                return Task::perform(async {}, |_| Message::SaveDataset);
+                Task::perform(async {}, |_| Message::SaveDataset)
             }
             Message::ClearPressed => {
                 self.response = None;
@@ -326,7 +326,7 @@ impl App {
                     path: self.dataset_path.clone(),
                 };
 
-                return Task::perform(
+                Task::perform(
                     async move {
                         rfd::AsyncFileDialog::new()
                             .add_filter("sasin dataset", &["sasin"])
@@ -335,7 +335,7 @@ impl App {
                             .map(|h| h.path().to_owned())
                     },
                     Message::DatasetFileSelected,
-                );
+                )
             }
             Message::DatasetFileSelected(path_opt) => {
                 if let Some(path) = path_opt {
@@ -448,7 +448,7 @@ impl App {
             }
             Message::SaveDatasetAsPressed => {
                 let suggested = self.dataset_path.clone();
-                return Task::perform(
+                Task::perform(
                     async move {
                         rfd::AsyncFileDialog::new()
                             .add_filter("sasin dataset", &["sasin"])
@@ -463,7 +463,7 @@ impl App {
                             .map(|h| h.path().to_owned())
                     },
                     Message::DatasetSavePathSelected,
-                );
+                )
             }
             Message::DatasetSavePathSelected(path_opt) => {
                 if let Some(path) = path_opt {
@@ -539,7 +539,7 @@ impl App {
                 self.selected_request = Some(id);
 
                 // Persist immediately for "persistently update it"
-                Task::perform(async move { () }, |_| Message::SaveDataset)
+                Task::perform(async move {}, |_| Message::SaveDataset)
             }
             Message::RequestSelected(id) => {
                 if let Some(draft) = load_request_into_editor(&self.dataset, id) {
@@ -559,7 +559,7 @@ impl App {
                         self.request_name_input.clear();
                     }
                     self.dataset_dirty = true;
-                    return Task::perform(async move { () }, |_| Message::SaveDataset);
+                    return Task::perform(async move {}, |_| Message::SaveDataset);
                 }
                 Task::none()
             }
@@ -573,7 +573,7 @@ impl App {
                     if let Some(t) = collection.requests.iter_mut().find(|t| t.id == id) {
                         t.name = new_name.to_string();
                         self.dataset_dirty = true;
-                        return Task::perform(async move { () }, |_| Message::SaveDataset);
+                        return Task::perform(async move {}, |_| Message::SaveDataset);
                     }
                 }
                 Task::none()

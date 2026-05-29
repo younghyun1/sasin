@@ -45,10 +45,10 @@ pub fn app_state_dir() -> PathBuf {
     // Linux/Unix (including *BSD)
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
-            if !xdg.trim().is_empty() {
-                return PathBuf::from(xdg).join("sasin");
-            }
+        if let Ok(xdg) = env::var("XDG_CONFIG_HOME")
+            && !xdg.trim().is_empty()
+        {
+            return PathBuf::from(xdg).join("sasin");
         }
 
         if let Some(home) = home_dir() {
@@ -83,17 +83,17 @@ pub fn default_dataset_path() -> PathBuf {
 /// - Windows: `%USERPROFILE%` (or `%HOMEDRIVE%%HOMEPATH%` fallback)
 fn home_dir() -> Option<PathBuf> {
     // Unix/macOS
-    if let Ok(home) = env::var("HOME") {
-        if !home.trim().is_empty() {
-            return Some(PathBuf::from(home));
-        }
+    if let Ok(home) = env::var("HOME")
+        && !home.trim().is_empty()
+    {
+        return Some(PathBuf::from(home));
     }
 
     // Windows
-    if let Ok(userprofile) = env::var("USERPROFILE") {
-        if !userprofile.trim().is_empty() {
-            return Some(PathBuf::from(userprofile));
-        }
+    if let Ok(userprofile) = env::var("USERPROFILE")
+        && !userprofile.trim().is_empty()
+    {
+        return Some(PathBuf::from(userprofile));
     }
 
     let homedrive = env::var("HOMEDRIVE").ok();

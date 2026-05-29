@@ -320,24 +320,24 @@ where
                 state.dragging = false;
             }
             Event::Mouse(mouse::Event::CursorMoved { .. }) => {
-                if state.dragging {
-                    if let Some(pos) = cursor.position_in(bounds) {
-                        let raw = match self.axis {
-                            SplitAxis::Horizontal => pos.x - state.drag_offset,
-                            SplitAxis::Vertical => pos.y - state.drag_offset,
-                        };
+                if state.dragging
+                    && let Some(pos) = cursor.position_in(bounds)
+                {
+                    let raw = match self.axis {
+                        SplitAxis::Horizontal => pos.x - state.drag_offset,
+                        SplitAxis::Vertical => pos.y - state.drag_offset,
+                    };
 
-                        let clamped = clamp_split(
-                            self.axis,
-                            raw,
-                            bounds.size(),
-                            self.min_first_px,
-                            self.min_second_px,
-                        );
+                    let clamped = clamp_split(
+                        self.axis,
+                        raw,
+                        bounds.size(),
+                        self.min_first_px,
+                        self.min_second_px,
+                    );
 
-                        self.split_px = clamped;
-                        shell.publish(on_drag(clamped));
-                    }
+                    self.split_px = clamped;
+                    shell.publish(on_drag(clamped));
                 }
             }
             _ => {}

@@ -124,9 +124,9 @@ impl<'a> RequestEditor<'a> {
             .height(self.body_height_px);
 
         let request_name_input = text_input("Request name…", self.request_name)
-            // Parent can decide what this means; immediate-mutation mode may
-            // interpret as "rename selected request".
-            .on_input(|s| Message::RenameRequestPressed(0, s))
+            // Updates the draft name; the parent applies it to the selected request
+            // (immediate-mutation) or uses it as the name for the next "New Request".
+            .on_input(Message::RequestNameChanged)
             .padding(12)
             .size(14)
             .width(Length::Fill);

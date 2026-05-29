@@ -174,13 +174,10 @@ impl<'a> ResponseView<'a> {
             );
         }
 
-        let body_text = self.body_text.map(|s| s.to_string()).unwrap_or_else(|| {
-            if resp.body.is_empty() {
-                "<empty body>".to_string()
-            } else {
-                resp.body.clone()
-            }
-        });
+        let body_text = match self.body_text {
+            Some(s) => s.to_string(),
+            None => format_body(&resp.body, self.pretty_json),
+        };
 
         col = col.push(text("Body").size(16)).push(
             scrollable(text(body_text).size(12))
@@ -194,4 +191,29 @@ impl<'a> ResponseView<'a> {
             .height(Length::Fill)
             .into()
     }
+}
+
+impl<'a> Default for ResponseView<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Best-effort body formatting for display.
+///
+/// Pretty-prints JSON when `pretty_json` is enabled and the body parses as JSON; otherwise returns
+/// the raw body unchanged. Empty bodies render a placeholder.
+fn format_body(body: &str, pretty_json: bool) -> String {
+    if body.is_empty() {
+        return "<empty body>".to_string();
+    }
+
+    if pretty_json
+        && let Ok(value) = serde_json::from_str::<serde_json::Value>(body)
+        && let Ok(pretty) = serde_json::to_string_pretty(&value)
+    {
+        return pretty;
+    }
+
+    body.to_string()
 }
