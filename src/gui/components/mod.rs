@@ -3,6 +3,7 @@
 //! `tree`, `tabs`, and `editor` are free-function view modules; the rest are builder types.
 
 pub mod editor;
+pub mod env_panel;
 pub mod kv_table;
 pub mod response_view;
 pub mod section;

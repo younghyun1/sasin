@@ -94,6 +94,11 @@ pub enum Message {
     NewRequest,
     DeleteNode(NodePath),
 
+    // --- Environments ---
+    SelectEnv(usize),
+    NewEnv,
+    EnvVar(KvOp),
+
     // --- Tabs ---
     SelectTab(usize),
     CloseTab(usize),

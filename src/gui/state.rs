@@ -7,7 +7,7 @@
 use iced::widget::text_editor;
 
 use crate::gui::messages::{EditorPanel, KvOp};
-use crate::model::{Body, FormKind, FormPart, KvEntry, Node, NodePath};
+use crate::model::{Body, FormKind, FormPart, KvEntry, Node, NodePath, Variable};
 use crate::models::ResponseModel;
 
 /// What a tab is editing.
@@ -151,6 +151,33 @@ pub(crate) fn apply_kv_entry(list: &mut Vec<KvEntry>, op: KvOp) {
         KvOp::Toggle(i, b) => {
             if let Some(e) = list.get_mut(i) {
                 e.enabled = b;
+            }
+        }
+    }
+}
+
+/// Apply a row op to an environment's variables (preserving secret/description).
+pub(crate) fn apply_kv_variable(vars: &mut Vec<Variable>, op: KvOp) {
+    match op {
+        KvOp::Add => vars.push(Variable::new(String::new(), String::new())),
+        KvOp::Remove(i) => {
+            if i < vars.len() {
+                vars.remove(i);
+            }
+        }
+        KvOp::Key(i, s) => {
+            if let Some(v) = vars.get_mut(i) {
+                v.key = s;
+            }
+        }
+        KvOp::Value(i, s) => {
+            if let Some(v) = vars.get_mut(i) {
+                v.value = s;
+            }
+        }
+        KvOp::Toggle(i, b) => {
+            if let Some(v) = vars.get_mut(i) {
+                v.enabled = b;
             }
         }
     }

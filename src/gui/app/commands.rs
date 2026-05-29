@@ -6,6 +6,7 @@ use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::state;
 use crate::model::{Node, find_node, find_node_mut, resolve_auth};
+use crate::runtime;
 use crate::storage::save_workspace;
 
 impl App {
@@ -45,14 +46,18 @@ impl App {
         }
 
         // Only HTTP requests are sent here (websocket sessions are interactive — P7).
-        let request = match find_node(&self.workspace.root, &path) {
+        let mut request = match find_node(&self.workspace.root, &path) {
             Some(Node::Http(r)) => r.clone(),
             _ => {
                 self.tabs[i].error = Some("This node is not an HTTP request.".to_string());
                 return Task::none();
             }
         };
-        let auth = resolve_auth(&self.workspace.root, &path);
+        // Resolve auth inheritance, then interpolate variables (active env overlaid on globals).
+        request.auth = resolve_auth(&self.workspace.root, &path);
+        let env = self.active_env.and_then(|idx| self.workspace.environments.get(idx));
+        let ctx = runtime::VarContext::from_scopes(&self.workspace.globals, env);
+        let request = runtime::resolve_request(&request, &ctx);
         let base_dir = self.workspace_dir.clone();
 
         if let Some(abort) = self.active_abort.take() {
@@ -71,7 +76,7 @@ impl App {
 
         let cfg = self.http_config.clone();
         let join = tokio::spawn(async move {
-            match crate::http::execute(&cfg, &request, &auth, &base_dir).await {
+            match crate::http::execute(&cfg, &request, &base_dir).await {
                 Ok(resp) => Message::RequestFinished(send_id, resp),
                 Err(err) => Message::RequestFailed(send_id, err),
             }

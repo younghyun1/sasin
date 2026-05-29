@@ -5,7 +5,7 @@ use iced::{Element, Length};
 
 use crate::gui::Message;
 use crate::gui::app::App;
-use crate::gui::components::{ResponseView, Split, SplitAxis, editor, tabs, tree};
+use crate::gui::components::{ResponseView, Split, SplitAxis, editor, env_panel, tabs, tree};
 use crate::gui::messages::SplitId;
 use crate::gui::theme;
 use crate::model::{Node, find_node};
@@ -19,6 +19,7 @@ impl App {
                 button(text("New Request").size(13))
                     .padding(8)
                     .on_press(Message::NewRequest),
+                env_panel::view(&self.workspace.environments, self.active_env),
             ]
             .spacing(10)
             .padding(10),

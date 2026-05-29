@@ -1,5 +1,7 @@
 //! Editor field handlers: mutate the active HTTP request node directly from editor messages.
 
+use std::collections::HashSet;
+
 use iced::widget::text_editor;
 
 use crate::gui::app::App;
@@ -7,10 +9,39 @@ use crate::gui::messages::{
     AuthChoice, AuthFieldKind, BodyModeChoice, EditorPanel, KvOp, KvTarget, SettingFlag,
 };
 use crate::gui::state;
-use crate::model::{ApiKeyLoc, Auth, Body, FormKind, HttpRequest, Node, RawLang, find_node_mut};
+use crate::model::{
+    ApiKeyLoc, Auth, Body, Environment, FormKind, HttpRequest, Node, RawLang, find_node_mut,
+};
 use crate::models::HttpMethod;
+use crate::storage::layout::unique_slug;
 
 impl App {
+    pub(super) fn select_env(&mut self, idx: usize) {
+        if idx < self.workspace.environments.len() {
+            self.active_env = Some(idx);
+        }
+    }
+
+    pub(super) fn new_env(&mut self) {
+        let mut taken: HashSet<String> =
+            self.workspace.environments.iter().map(|e| e.slug.clone()).collect();
+        let slug = unique_slug("env", &mut taken);
+        self.workspace.environments.push(Environment {
+            slug: slug.clone(),
+            name: slug,
+            variables: Vec::new(),
+        });
+        self.active_env = Some(self.workspace.environments.len() - 1);
+    }
+
+    pub(super) fn apply_env_var(&mut self, op: KvOp) {
+        if let Some(idx) = self.active_env
+            && let Some(env) = self.workspace.environments.get_mut(idx)
+        {
+            state::apply_kv_variable(&mut env.variables, op);
+        }
+    }
+
     /// `&mut HttpRequest` for the active tab's node, if it is an HTTP request.
     fn active_http_mut(&mut self) -> Option<&mut HttpRequest> {
         let path = self

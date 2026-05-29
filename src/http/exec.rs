@@ -9,15 +9,14 @@ use reqwest::header::{HeaderName, HeaderValue};
 use crate::http::auth::apply_auth;
 use crate::http::body::apply_body;
 use crate::http::client::HttpClientConfig;
-use crate::model::{Auth, HttpRequest, KvEntry};
+use crate::model::{HttpRequest, KvEntry};
 use crate::models::ResponseModel;
 
-/// Build and send `request`, applying the already-resolved `auth`. File bodies resolve against
+/// Build and send `request` (with auth/variables already resolved). File bodies resolve against
 /// `base_dir` (the workspace directory). Returns a thin response model.
 pub async fn execute(
     config: &HttpClientConfig,
     request: &HttpRequest,
-    auth: &Auth,
     base_dir: &Path,
 ) -> Result<ResponseModel, String> {
     let client = build_client(config, request)?;
@@ -26,7 +25,7 @@ pub async fn execute(
 
     let mut rb = client.request(method, url);
     rb = apply_headers(rb, &request.headers)?;
-    rb = apply_auth(rb, auth);
+    rb = apply_auth(rb, &request.auth);
     let user_content_type = request
         .headers
         .iter()

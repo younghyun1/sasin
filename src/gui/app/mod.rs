@@ -32,6 +32,8 @@ pub struct App {
     expanded: HashSet<NodePath>,
     tabs: Vec<Tab>,
     active: Option<usize>,
+    /// Index into `workspace.environments`; `None` means no active environment.
+    active_env: Option<usize>,
     http_config: HttpClientConfig,
     send_gen: u64,
     active_abort: Option<tokio::task::AbortHandle>,
@@ -48,12 +50,18 @@ impl App {
         let dir = app_state_dir().join("workspace");
         let legacy = default_dataset_path();
         let (workspace, status) = load_or_init(&dir, &legacy);
+        let active_env = if workspace.environments.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
         let app = Self {
             workspace_dir: dir,
             workspace,
             expanded: HashSet::new(),
             tabs: Vec::new(),
             active: None,
+            active_env,
             http_config: HttpClientConfig::default(),
             send_gen: 0,
             active_abort: None,
@@ -124,6 +132,18 @@ impl App {
                     self.status = Some(format!("Delete failed: {e}"));
                 }
                 self.active = active_path.and_then(|p| self.tabs.iter().position(|t| t.path == p));
+                self.save_task()
+            }
+            Message::SelectEnv(idx) => {
+                self.select_env(idx);
+                Task::none()
+            }
+            Message::NewEnv => {
+                self.new_env();
+                self.save_task()
+            }
+            Message::EnvVar(op) => {
+                self.apply_env_var(op);
                 self.save_task()
             }
             Message::SelectTab(i) => {

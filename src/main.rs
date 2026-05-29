@@ -13,6 +13,7 @@ pub mod http;
 pub mod model;
 pub mod models;
 pub mod persist;
+pub mod runtime;
 pub mod setup_logger;
 pub mod storage;
 
