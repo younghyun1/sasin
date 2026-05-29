@@ -62,14 +62,7 @@ pub fn app_state_dir() -> PathBuf {
         .join(".sasin")
 }
 
-/// Default path for the app config file.
-///
-/// This stores small app state like "last opened dataset path".
-pub fn default_config_path() -> PathBuf {
-    app_state_dir().join("config.sasin")
-}
-
-/// Default path for the dataset file.
+/// Default path for the legacy dataset file (used to detect a pre-workspace install to migrate).
 ///
 /// This stores saved request templates (method/url/headers/body).
 pub fn default_dataset_path() -> PathBuf {

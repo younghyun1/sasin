@@ -1,9 +1,10 @@
-pub mod config;
+//! Legacy binary dataset format, kept only for one-time migration into the TOML workspace,
+//! plus cross-platform state-directory paths.
+
 pub mod dataset;
 pub mod paths;
 
-pub use config::{AppConfig, AppConfigFile, LayoutState, WindowState, load_startup_dataset};
 pub use dataset::{
     Collection, Dataset, DatasetFile, DatasetId, PersistError, PersistResult, Request,
 };
-pub use paths::{app_state_dir, default_config_path, default_dataset_path};
+pub use paths::{app_state_dir, default_dataset_path};
