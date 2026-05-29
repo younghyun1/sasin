@@ -84,6 +84,7 @@ fn panel_bar(active: EditorPanel) -> Element<'static, Message> {
         make("Headers", EditorPanel::Headers),
         make("Auth", EditorPanel::Auth),
         make("Body", EditorPanel::Body),
+        make("Scripts", EditorPanel::Scripts),
         make("Settings", EditorPanel::Settings),
     ]
     .spacing(6)

@@ -15,6 +15,7 @@ pub mod model;
 pub mod models;
 pub mod persist;
 pub mod runtime;
+pub mod scripting;
 pub mod setup_logger;
 pub mod storage;
 

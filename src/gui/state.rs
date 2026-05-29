@@ -9,6 +9,7 @@ use iced::widget::text_editor;
 use crate::gui::messages::{EditorPanel, KvOp};
 use crate::model::{Body, FormKind, FormPart, KvEntry, Node, NodePath, Variable};
 use crate::models::ResponseModel;
+use crate::scripting::TestResult;
 
 /// What a tab is editing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +31,14 @@ pub struct Tab {
     pub body: text_editor::Content,
     /// GraphQL variables buffer.
     pub gql_vars: text_editor::Content,
+    /// Pre-request script buffer.
+    pub pre_script: text_editor::Content,
+    /// Test script buffer.
+    pub test_script: text_editor::Content,
+    /// Last script run's test results, console output, and error (ephemeral, per send).
+    pub script_tests: Vec<TestResult>,
+    pub script_console: Vec<String>,
+    pub script_error: Option<String>,
     pub dirty: bool,
     pub sending: bool,
     /// Generation of the in-flight send, used to drop stale results.
@@ -65,6 +74,10 @@ impl Tab {
             Node::Http(r) => r.settings.timeout_ms.to_string(),
             _ => "30000".to_string(),
         };
+        let (pre, test) = match node {
+            Node::Http(r) => (r.scripts.pre_request.clone(), r.scripts.test.clone()),
+            _ => (String::new(), String::new()),
+        };
         Self {
             path,
             kind,
@@ -73,6 +86,11 @@ impl Tab {
             timeout_text,
             body: text_editor::Content::with_text(&body),
             gql_vars: text_editor::Content::with_text(&vars),
+            pre_script: text_editor::Content::with_text(&pre),
+            test_script: text_editor::Content::with_text(&test),
+            script_tests: Vec::new(),
+            script_console: Vec::new(),
+            script_error: None,
             dirty: false,
             sending: false,
             send_gen: 0,
@@ -99,6 +117,14 @@ pub fn sync_body(tab: &Tab, node: &mut Node) {
             }
             _ => {}
         }
+    }
+}
+
+/// Write the script buffers back into the node's scripts (called on script edits).
+pub fn sync_scripts(tab: &Tab, node: &mut Node) {
+    if let Node::Http(r) = node {
+        r.scripts.pre_request = tab.pre_script.text();
+        r.scripts.test = tab.test_script.text();
     }
 }
 

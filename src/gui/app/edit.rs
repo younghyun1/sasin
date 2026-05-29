@@ -270,6 +270,27 @@ impl App {
         }
     }
 
+    /// Perform a script-editor action on the pre-request or test buffer, then sync to the node.
+    pub(super) fn script_action(&mut self, action: text_editor::Action, is_test: bool) {
+        let Some(i) = self.active else {
+            return;
+        };
+        let edited = action.is_edit();
+        if is_test {
+            self.tabs[i].test_script.perform(action);
+        } else {
+            self.tabs[i].pre_script.perform(action);
+        }
+        if !edited {
+            return;
+        }
+        self.tabs[i].dirty = true;
+        let path = self.tabs[i].path.clone();
+        if let Some(node) = find_node_mut(&mut self.workspace.root, &path) {
+            state::sync_scripts(&self.tabs[i], node);
+        }
+    }
+
     /// Perform a body-editor action on the right buffer, then sync it into the node.
     pub(super) fn body_action(&mut self, action: text_editor::Action, gql_vars: bool) {
         let Some(i) = self.active else {

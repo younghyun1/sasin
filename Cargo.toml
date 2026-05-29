@@ -57,6 +57,15 @@ zstd = "0.13.2"
 # native file dialogs for dataset open/save
 rfd = "0.15.2"
 
+# embedded JS engine for pm.* scripting (feature-gated; needs a C toolchain to build)
+rquickjs = { version = "0.9", optional = true }
+
+[features]
+# Scripting is on by default (the build already needs a C toolchain for zstd/quickjs).
+# Disable with `--no-default-features` to drop the rquickjs dependency.
+default = ["scripting"]
+scripting = ["dep:rquickjs"]
+
 [build-dependencies]
 chrono = { version = "0.4.42" }
 dotenvy = "0.15.7"

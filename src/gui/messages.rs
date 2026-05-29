@@ -24,6 +24,7 @@ pub enum EditorPanel {
     Headers,
     Auth,
     Body,
+    Scripts,
     Settings,
 }
 
@@ -126,6 +127,8 @@ pub enum Message {
     RawLangChanged(RawLang),
     BodyAction(text_editor::Action),
     GqlVarsAction(text_editor::Action),
+    PreScriptAction(text_editor::Action),
+    TestScriptAction(text_editor::Action),
     FormPartFile(usize, bool),
     FormPartSrc(usize, String),
     BinaryFileChanged(String),

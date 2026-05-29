@@ -33,9 +33,14 @@ impl VarContext {
         Self { map }
     }
 
-    /// Set a variable (used by pre-request scripts in P6).
+    /// Set a variable (used by pre-request scripts).
     pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.map.insert(key.into(), value.into());
+    }
+
+    /// A snapshot of the current variables (for injection into a script engine).
+    pub fn snapshot(&self) -> HashMap<String, String> {
+        self.map.clone()
     }
 
     /// Look up a name: dynamic generator if it starts with `$`, otherwise a scope variable.
@@ -107,8 +112,12 @@ fn resolve_auth(auth: &Auth, ctx: &VarContext) -> Auth {
             user: interpolate(user, ctx),
             pass: interpolate(pass, ctx),
         },
-        Auth::Bearer { token } => Auth::Bearer { token: interpolate(token, ctx) },
-        Auth::OAuth2 { token } => Auth::OAuth2 { token: interpolate(token, ctx) },
+        Auth::Bearer { token } => Auth::Bearer {
+            token: interpolate(token, ctx),
+        },
+        Auth::OAuth2 { token } => Auth::OAuth2 {
+            token: interpolate(token, ctx),
+        },
         Auth::ApiKey { key, value, add_to } => Auth::ApiKey {
             key: interpolate(key, ctx),
             value: interpolate(value, ctx),
@@ -146,7 +155,9 @@ fn resolve_body(body: &Body, ctx: &VarContext) -> Body {
                 })
                 .collect(),
         },
-        Body::Binary { file } => Body::Binary { file: interpolate(file, ctx) },
+        Body::Binary { file } => Body::Binary {
+            file: interpolate(file, ctx),
+        },
         Body::GraphQl { query, variables } => Body::GraphQl {
             query: interpolate(query, ctx),
             variables: interpolate(variables, ctx),
@@ -197,10 +208,7 @@ mod tests {
     use crate::model::Variable;
 
     fn ctx() -> VarContext {
-        VarContext::from_scopes(
-            &[Variable::new("g", "gv")],
-            None,
-        )
+        VarContext::from_scopes(&[Variable::new("g", "gv")], None)
     }
 
     #[test]
@@ -235,10 +243,18 @@ mod tests {
 
     #[test]
     fn resolves_request_fields() {
-        let c = VarContext::from_scopes(&[Variable::new("h", "example.com"), Variable::new("tok", "abc")], None);
+        let c = VarContext::from_scopes(
+            &[
+                Variable::new("h", "example.com"),
+                Variable::new("tok", "abc"),
+            ],
+            None,
+        );
         let mut req = HttpRequest::new("r", "R", "GET", "https://{{h}}/p");
         req.headers.push(crate::model::KvEntry::new("X", "{{tok}}"));
-        req.auth = Auth::Bearer { token: "{{tok}}".into() };
+        req.auth = Auth::Bearer {
+            token: "{{tok}}".into(),
+        };
         let resolved = resolve_request(&req, &c);
         assert_eq!(resolved.url, "https://example.com/p");
         assert_eq!(resolved.headers[0].value, "abc");

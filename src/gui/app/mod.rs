@@ -229,6 +229,14 @@ impl App {
                 self.body_action(action, true);
                 Task::none()
             }
+            Message::PreScriptAction(action) => {
+                self.script_action(action, false);
+                Task::none()
+            }
+            Message::TestScriptAction(action) => {
+                self.script_action(action, true);
+                Task::none()
+            }
             Message::FormPartFile(index, is_file) => {
                 self.set_form_kind(index, is_file);
                 Task::none()
@@ -280,14 +288,15 @@ impl App {
                 Task::none()
             }
             Message::RequestFinished(send_id, resp) => {
-                if let Some(tab) = self
+                if let Some(pos) = self
                     .tabs
-                    .iter_mut()
-                    .find(|t| t.send_gen == send_id && t.sending)
+                    .iter()
+                    .position(|t| t.send_gen == send_id && t.sending)
                 {
-                    tab.sending = false;
-                    tab.response = Some(resp);
-                    tab.error = None;
+                    self.tabs[pos].sending = false;
+                    self.tabs[pos].response = Some(resp);
+                    self.tabs[pos].error = None;
+                    self.run_test_script(pos);
                 }
                 self.active_abort = None;
                 Task::none()

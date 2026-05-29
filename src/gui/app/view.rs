@@ -1,12 +1,13 @@
 //! Rendering for [`App`]: sidebar tree, tab bar + editor, response, in two resizable splits.
 
-use iced::widget::{Space, button, column, container, row, text, text_input};
+use iced::widget::{Space, button, column, container, row, scrollable, text, text_input};
 use iced::{Element, Length};
 
 use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::components::{ResponseView, Split, SplitAxis, editor, env_panel, tabs, tree};
 use crate::gui::messages::SplitId;
+use crate::gui::state::Tab;
 use crate::gui::theme;
 use crate::model::{Node, find_node};
 
@@ -76,9 +77,14 @@ impl App {
             .headers_height(Length::Fixed(160.0))
             .view();
 
+        let response_pane: Element<'_, Message> = match active_tab {
+            Some(tab) => column![script_results(tab), response].spacing(4).into(),
+            None => response,
+        };
+
         let main: Element<'_, Message> = Split::new(SplitAxis::Vertical)
             .first(editor_area)
-            .second(response)
+            .second(response_pane)
             .split_px(self.editor_px)
             .min_first_px(220.0)
             .min_second_px(160.0)
@@ -105,4 +111,33 @@ impl App {
             .height(Length::Fill)
             .into()
     }
+}
+
+/// A compact strip of test results + console output from the last script run (empty when none).
+fn script_results(tab: &Tab) -> Element<'_, Message> {
+    if tab.script_tests.is_empty() && tab.script_console.is_empty() && tab.script_error.is_none() {
+        return Space::new().height(Length::Fixed(0.0)).into();
+    }
+    let mut col = column![text("Tests").size(13)].spacing(2);
+    if let Some(e) = &tab.script_error {
+        col = col.push(text(format!("⚠ script error: {e}")).size(12));
+    }
+    for t in &tab.script_tests {
+        let line = if t.passed {
+            format!("✓ {}", t.name)
+        } else {
+            match &t.error {
+                Some(e) => format!("✗ {} — {e}", t.name),
+                None => format!("✗ {}", t.name),
+            }
+        };
+        col = col.push(text(line).size(12));
+    }
+    for line in &tab.script_console {
+        col = col.push(text(format!("» {line}")).size(11));
+    }
+    container(scrollable(col).height(Length::Fixed(120.0)))
+        .padding(6)
+        .width(Length::Fill)
+        .into()
 }

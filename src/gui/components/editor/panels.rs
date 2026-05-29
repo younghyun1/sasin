@@ -22,8 +22,27 @@ pub fn view<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
         EditorPanel::Headers => kv_table::view(KvTarget::Headers, &req.headers, "Header", "Value"),
         EditorPanel::Auth => auth_panel(&req.auth),
         EditorPanel::Body => body_panel(req, tab),
+        EditorPanel::Scripts => scripts_panel(tab),
         EditorPanel::Settings => settings_panel(req, tab),
     }
+}
+
+fn scripts_panel(tab: &Tab) -> Element<'_, Message> {
+    column![
+        text("Pre-request script").size(13),
+        text_editor(&tab.pre_script)
+            .placeholder("pm.environment.set('ts', Date.now())")
+            .on_action(Message::PreScriptAction)
+            .height(Length::Fixed(150.0)),
+        text("Test script").size(13),
+        text_editor(&tab.test_script)
+            .placeholder("pm.test('status ok', () => pm.response.to.have.status(200))")
+            .on_action(Message::TestScriptAction)
+            .height(Length::Fixed(150.0)),
+    ]
+    .spacing(6)
+    .width(Length::Fill)
+    .into()
 }
 
 fn labeled_input<'a>(label: &'a str, value: &'a str, kind: AuthFieldKind) -> Element<'a, Message> {
