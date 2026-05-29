@@ -257,10 +257,10 @@ where
         // Forward to children first so they can react normally.
         {
             let mut children = layout.children();
-            let first_layout = children.next().expect("Split must have first child layout");
-            let second_layout = children
-                .next()
-                .expect("Split must have second child layout");
+            let (Some(first_layout), Some(second_layout)) = (children.next(), children.next())
+            else {
+                return;
+            };
 
             self.first.as_widget_mut().update(
                 &mut tree.children[0],
@@ -374,10 +374,13 @@ where
 
         // Otherwise, take the "max" interaction of the children.
         let mut children = layout.children();
+        let (Some(first_layout), Some(second_layout)) = (children.next(), children.next()) else {
+            return mouse::Interaction::default();
+        };
 
         let first = self.first.as_widget().mouse_interaction(
             &tree.children[0],
-            children.next().unwrap(),
+            first_layout,
             cursor,
             viewport,
             renderer,
@@ -385,7 +388,7 @@ where
 
         let second = self.second.as_widget().mouse_interaction(
             &tree.children[1],
-            children.next().unwrap(),
+            second_layout,
             cursor,
             viewport,
             renderer,
@@ -405,13 +408,16 @@ where
         viewport: &Rectangle,
     ) {
         let mut children = layout.children();
+        let (Some(first_layout), Some(second_layout)) = (children.next(), children.next()) else {
+            return;
+        };
 
         self.first.as_widget().draw(
             &tree.children[0],
             renderer,
             theme,
             style,
-            children.next().unwrap(),
+            first_layout,
             cursor,
             viewport,
         );
@@ -421,7 +427,7 @@ where
             renderer,
             theme,
             style,
-            children.next().unwrap(),
+            second_layout,
             cursor,
             viewport,
         );
@@ -460,17 +466,20 @@ where
         operation: &mut dyn iced::advanced::widget::Operation,
     ) {
         let mut children = layout.children();
+        let (Some(first_layout), Some(second_layout)) = (children.next(), children.next()) else {
+            return;
+        };
 
         self.first.as_widget_mut().operate(
             &mut tree.children[0],
-            children.next().unwrap(),
+            first_layout,
             renderer,
             operation,
         );
 
         self.second.as_widget_mut().operate(
             &mut tree.children[1],
-            children.next().unwrap(),
+            second_layout,
             renderer,
             operation,
         );
@@ -485,6 +494,9 @@ where
         translation: Vector,
     ) -> Option<iced::advanced::overlay::Element<'b, Message, Theme, Renderer>> {
         let mut children = layout.children();
+        let (Some(first_layout), Some(second_layout)) = (children.next(), children.next()) else {
+            return None;
+        };
 
         // We need two disjoint mutable borrows of `tree.children`.
         let (first_tree, second_tree) = tree.children.split_at_mut(1);
@@ -493,7 +505,7 @@ where
 
         let first = self.first.as_widget_mut().overlay(
             first_tree,
-            children.next().unwrap(),
+            first_layout,
             renderer,
             viewport,
             translation,
@@ -501,7 +513,7 @@ where
 
         let second = self.second.as_widget_mut().overlay(
             second_tree,
-            children.next().unwrap(),
+            second_layout,
             renderer,
             viewport,
             translation,

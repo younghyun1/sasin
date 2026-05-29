@@ -79,3 +79,47 @@ impl Folder {
         }
     }
 }
+
+/// A path to a node: the sequence of slugs from a root to the node.
+pub type NodePath = Vec<String>;
+
+/// Find a node by its slug path, walking folders. `None` if any segment is missing.
+pub fn find_node<'a>(roots: &'a [Node], path: &[String]) -> Option<&'a Node> {
+    let (first, rest) = path.split_first()?;
+    let node = roots.iter().find(|n| n.slug() == first)?;
+    if rest.is_empty() {
+        Some(node)
+    } else if let Node::Folder(folder) = node {
+        find_node(&folder.children, rest)
+    } else {
+        None
+    }
+}
+
+/// Mutable variant of [`find_node`].
+pub fn find_node_mut<'a>(roots: &'a mut [Node], path: &[String]) -> Option<&'a mut Node> {
+    let (first, rest) = path.split_first()?;
+    let node = roots.iter_mut().find(|n| n.slug() == first)?;
+    if rest.is_empty() {
+        Some(node)
+    } else {
+        match node {
+            Node::Folder(folder) => find_node_mut(&mut folder.children, rest),
+            _ => None,
+        }
+    }
+}
+
+/// Remove and return the node at `path`, if present.
+pub fn remove_node(roots: &mut Vec<Node>, path: &[String]) -> Option<Node> {
+    let (first, rest) = path.split_first()?;
+    if rest.is_empty() {
+        let idx = roots.iter().position(|n| n.slug() == first)?;
+        Some(roots.remove(idx))
+    } else {
+        match roots.iter_mut().find(|n| n.slug() == first)? {
+            Node::Folder(folder) => remove_node(&mut folder.children, rest),
+            _ => None,
+        }
+    }
+}

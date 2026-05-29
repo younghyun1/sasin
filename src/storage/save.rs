@@ -71,6 +71,33 @@ fn write_env_file(path: &Path, name: &str, variables: &[Variable]) -> StorageRes
     write_atomic(path, s.as_bytes())
 }
 
+/// Delete the on-disk file (or folder directory) for a node at `path`. Tries the HTTP and
+/// WebSocket request files and the folder directory; missing targets are ignored. `save_workspace`
+/// does not prune, so the GUI calls this when removing a node.
+pub fn delete_node(dir: &Path, path: &[String]) -> StorageResult<()> {
+    let Some((last, parents)) = path.split_last() else {
+        return Ok(());
+    };
+    let mut base = dir.to_path_buf();
+    for seg in parents {
+        base = base.join(seg);
+    }
+
+    let req = base.join(format!("{last}{REQUEST_SUFFIX}"));
+    let ws = base.join(format!("{last}{WS_SUFFIX}"));
+    let folder = base.join(last);
+
+    for file in [req, ws] {
+        if file.is_file() {
+            fs::remove_file(&file).map_err(|e| StorageError::io(&file, e))?;
+        }
+    }
+    if folder.is_dir() {
+        fs::remove_dir_all(&folder).map_err(|e| StorageError::io(&folder, e))?;
+    }
+    Ok(())
+}
+
 /// Recursively write nodes into `dir`.
 pub fn save_nodes(dir: &Path, nodes: &[Node]) -> StorageResult<()> {
     for node in nodes {

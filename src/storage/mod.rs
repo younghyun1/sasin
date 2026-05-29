@@ -23,4 +23,4 @@ pub use cache::{
 pub use error::{StorageError, StorageResult};
 pub use load::load_workspace;
 pub use migrate::{migrate_legacy, workspace_from_dataset};
-pub use save::{save_nodes, save_workspace, write_manifest};
+pub use save::{delete_node, save_nodes, save_workspace, write_manifest};

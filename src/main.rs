@@ -28,6 +28,12 @@ fn main() -> iced::Result {
 
     let _guards = rt.block_on(async { setup_logger().await });
 
-    // Iced 0.14 style: provide update + view fns.
-    iced::run(crate::gui::App::update, crate::gui::App::view)
+    // Iced 0.14 builder: boot (loads the workspace) + update + view, with a dynamic title.
+    iced::application(
+        crate::gui::App::new,
+        crate::gui::App::update,
+        crate::gui::App::view,
+    )
+    .title(crate::gui::App::title)
+    .run()
 }

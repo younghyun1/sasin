@@ -37,6 +37,20 @@ impl HttpMethod {
         ]
     }
 
+    /// Parse a method string (case-insensitive). Returns `None` for unknown verbs.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_uppercase().as_str() {
+            "GET" => Some(HttpMethod::Get),
+            "POST" => Some(HttpMethod::Post),
+            "PUT" => Some(HttpMethod::Put),
+            "DELETE" => Some(HttpMethod::Delete),
+            "PATCH" => Some(HttpMethod::Patch),
+            "HEAD" => Some(HttpMethod::Head),
+            "OPTIONS" => Some(HttpMethod::Options),
+            _ => None,
+        }
+    }
+
     pub const fn as_str(self) -> &'static str {
         match self {
             HttpMethod::Get => "GET",
