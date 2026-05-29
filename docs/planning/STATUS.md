@@ -1,4 +1,4 @@
-# Status — P0 through P7 delivered
+# Status — P0 through P8 delivered
 
 Snapshot of the execution against [03-roadmap.md](03-roadmap.md). Branch `feat/p0-stabilize`.
 
@@ -17,9 +17,19 @@ Snapshot of the execution against [03-roadmap.md](03-roadmap.md). Branch `feat/p
 | P5 curl | `d0026ea` | curl import (paste) + export (copy) |
 | P6 scripting | `a1a7aa9` | rquickjs `pm.*` pre-request + test scripts |
 | P7 websocket | `52f08d3` | tokio-tungstenite console via iced Subscription |
+| P8 S1 chore | `eb5ef3c` | drop dead_code allows; storage recursion guard |
+| P8 S2 runner | `b801ca1` | runner core (flatten/plan/data/report) + tests |
+| P8 S3 runner GUI | `2066c00` | run-folder panel, data file, pass/fail summary |
+| P8 S4 response | `cf2b327` | response tabs Body/Headers/Cookies/Preview + search + save-example |
+| P8 S5 highlight | `2a1c1e0` | syntect highlighting in body/script editors |
+| P8 S6 history | `83d455c` | persisted request history + sidebar list |
+| P8 S7 cookies | `1995510` | shared session cookie jar + cookie manager |
+| P8 S8 watch | `4d33d64` | notify file-watch reload on external change |
+| P8 S9 websocket | `88679b4` | WS auto-reconnect + concurrent sessions |
 
-Each phase: `cargo clippy --all-targets -D warnings` clean, tests green, sillok-logged.
-P0/P1/P2/P3a were adversarially reviewed inline; P3b–P7 reviewed in a consolidated pass.
+Each phase: `cargo clippy --all-targets -D warnings` clean (default + `--no-default-features`),
+tests green, sillok-logged. P0/P1/P2/P3a reviewed inline; P3b–P7 and P8 each reviewed in an
+adversarial review→verify workflow pass.
 
 ## What works (Postman parity)
 
@@ -40,16 +50,29 @@ P0/P1/P2/P3a were adversarially reviewed inline; P3b–P7 reviewed in a consolid
   connect headers + auth + subprotocols (interpolated).
 - **Shell**: collection tree (expand/open/delete), multi-tab editing, resizable panes.
 
-## Deferred to P8 (polish / runner)
+## P8 delivered (runner + polish)
 
-- Collection runner (sequential, iterations + data file, aggregate results).
-- Response panel tabs: Cookies, Preview (HTML/image), search, save-as-example.
-- Syntax highlighting in body/response/script editors (iced `highlighter` feature).
-- Persisted request history UI; cookie-manager UI; file-watch reload on git pull.
-- WebSocket: auto-reconnect, multiple concurrent sessions, Socket.IO (out of scope).
-- Robustness (from P1/P3a reviews): symlink-cycle / recursion-depth guards, multi-process
-  temp-file naming — low risk for a local single-process tool.
-- Drop the temporary `#![allow(dead_code)]` on `model`/`storage` (most is now used).
+- **Collection runner**: flatten a folder/workspace into an ordered request list, run sequentially
+  with iteration count + CSV/JSON data file (per-iteration variable overrides), live pass/fail +
+  assertion summary. pm.* scripts run on the UI thread; the GUI steps the plan via the send path.
+- **Response panel tabs**: Body (pretty/raw + line search), Headers, Cookies (parsed Set-Cookie),
+  Preview (HTML source / image note); save-as-example writes a `.http` dump to `<req>.examples/`.
+- **Syntax highlighting**: iced `highlighter` (syntect) on raw-body, GraphQL, and script editors.
+- **Persisted history**: every send recorded (capped) + sidebar list; click re-creates the request.
+- **Cookie manager**: session-wide shared jar (cookies persist across sends) + view/clear UI.
+- **File-watch reload**: `notify` subscription reloads on external change (git pull) when the
+  on-disk tree differs from memory — own saves never loop.
+- **WebSocket**: auto-reconnect with exponential backoff + multiple concurrent sessions.
+- **Robustness**: storage recursion-depth guard (symlink-cycle safe); dropped the temporary
+  `#![allow(dead_code)]` on `model`/`storage` (compiles clean without it).
+
+## Remaining / out of scope
+
+- Socket.IO and protobuf WS framing (out of scope — raw ws/wss only).
+- HTML *rendering* in Preview (shows source; no embedded browser); inline image preview
+  (response body is stored as `String`, so binary bodies aren't retained for display).
+- Cookie manager add/edit individual cookies (view + clear only).
+- Multi-process temp-file naming on save — low risk for a local single-process tool.
 
 ## Caveat
 
