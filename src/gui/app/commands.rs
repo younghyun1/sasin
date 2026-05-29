@@ -9,6 +9,7 @@ use crate::gui::app::App;
 use crate::gui::state::{self, Tab};
 use crate::interop;
 use crate::model::{Node, find_node, find_node_mut, resolve_auth};
+use crate::models::ResponseModel;
 use crate::runtime;
 use crate::scripting;
 use crate::storage::layout::unique_slug;
@@ -79,6 +80,45 @@ impl App {
             }
             _ => Task::none(),
         }
+    }
+
+    /// Save the active tab's current response to `<request>.examples/` as a readable `.http` dump.
+    pub(super) fn save_as_example(&mut self) -> Task<Message> {
+        let Some(i) = self.active else {
+            return Task::none();
+        };
+        let path = self.tabs[i].path.clone();
+        let Some(resp) = self.tabs[i].response.clone() else {
+            return notice("No response to save yet.");
+        };
+        let Some((slug, parents)) = path.split_last() else {
+            return Task::none();
+        };
+        let mut dir = self.workspace_dir.clone();
+        for segment in parents {
+            dir.push(segment);
+        }
+        dir.push(format!("{slug}.examples"));
+        let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+        let file = dir.join(format!("example-{stamp}.http"));
+        let dump = format_example(&resp);
+
+        Task::perform(
+            async move {
+                let written = tokio::task::spawn_blocking(move || {
+                    std::fs::create_dir_all(&dir)
+                        .and_then(|()| std::fs::write(&file, dump))
+                        .map(|()| file.display().to_string())
+                })
+                .await;
+                match written {
+                    Ok(Ok(p)) => Message::Notice(format!("Saved example: {p}")),
+                    Ok(Err(e)) => Message::Notice(format!("Example save failed: {e}")),
+                    Err(e) => Message::Notice(format!("Example save failed: {e}")),
+                }
+            },
+            |m| m,
+        )
     }
 
     /// Run the active tab's test script against its response, recording results on the tab.
@@ -192,4 +232,24 @@ impl App {
             |msg| msg,
         )
     }
+}
+
+/// A one-shot task that just sets the status line.
+fn notice(message: &str) -> Task<Message> {
+    let message = message.to_string();
+    Task::perform(async move { message }, Message::Notice)
+}
+
+/// Render a response as a readable `.http`-style dump (status line, headers, blank line, body).
+fn format_example(resp: &ResponseModel) -> String {
+    let mut out = format!("HTTP {} {}\n", resp.status.code, resp.status.reason);
+    for (name, value) in resp.headers.iter() {
+        out.push_str(name.as_str());
+        out.push_str(": ");
+        out.push_str(value.to_str().unwrap_or("<non-utf8>"));
+        out.push('\n');
+    }
+    out.push('\n');
+    out.push_str(&resp.body);
+    out
 }

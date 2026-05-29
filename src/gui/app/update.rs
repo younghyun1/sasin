@@ -246,8 +246,17 @@ impl App {
                 self.pretty_json = !self.pretty_json;
                 Task::none()
             }
-            Message::ToggleShowHeaders => {
-                self.show_headers = !self.show_headers;
+            Message::SelectResponseTab(tab) => {
+                self.response_tab = tab;
+                Task::none()
+            }
+            Message::ResponseSearchChanged(text) => {
+                self.response_search = text;
+                Task::none()
+            }
+            Message::SaveAsExample => self.save_as_example(),
+            Message::Notice(text) => {
+                self.status = Some(text);
                 Task::none()
             }
             Message::SplitDragged(id, px) => {

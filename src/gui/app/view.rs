@@ -77,10 +77,9 @@ impl App {
         let response = ResponseView::new()
             .response(active_tab.and_then(|t| t.response.as_ref()))
             .error(active_tab.and_then(|t| t.error.as_deref()))
-            .show_headers(self.show_headers)
+            .tab(self.response_tab)
             .pretty_json(self.pretty_json)
-            .body_text(None)
-            .headers_height(Length::Fixed(160.0))
+            .search(&self.response_search)
             .view();
 
         let response_pane: Element<'_, Message> = match active_tab {

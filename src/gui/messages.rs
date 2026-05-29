@@ -18,6 +18,15 @@ pub enum SplitId {
     RequestResponse,
 }
 
+/// Response panel sub-tab.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResponseTab {
+    Body,
+    Headers,
+    Cookies,
+    Preview,
+}
+
 /// Editor sub-tab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditorPanel {
@@ -168,9 +177,14 @@ pub enum Message {
     RequestFinished(SendGen, ResponseModel),
     RequestFailed(SendGen, String),
 
-    // --- Response view toggles (global) ---
+    // --- Response view (global) ---
     TogglePrettyJson,
-    ToggleShowHeaders,
+    SelectResponseTab(ResponseTab),
+    ResponseSearchChanged(String),
+    SaveAsExample,
+
+    // --- Status / misc ---
+    Notice(String),
 
     // --- Layout ---
     SplitDragged(SplitId, f32),
