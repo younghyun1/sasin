@@ -197,10 +197,14 @@ fn build_config(req: &WsRequest, auth: &Auth, ctx: &runtime::VarContext) -> WsCo
         .iter()
         .map(|s| runtime::interpolate(s, ctx))
         .collect();
+    // NOTE: `req.settings.verify_tls` is not applied to websocket connections — disabling TLS
+    // verification would require a hand-rolled rustls dangerous verifier + crypto provider, which
+    // is out of scope here. WS TLS is always verified (the HTTP path honours verify_tls).
     WsConfig {
         url,
         headers,
         subprotocols,
         auto_reconnect: req.settings.auto_reconnect,
+        connect_timeout_ms: req.settings.connect_timeout_ms,
     }
 }

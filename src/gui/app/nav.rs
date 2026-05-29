@@ -8,8 +8,8 @@ use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::state::Tab;
 use crate::model::{HttpRequest, Node, NodePath, find_node, remove_node};
-use crate::storage::delete_node;
 use crate::storage::layout::unique_slug;
+use crate::storage::{HistoryRecord, delete_node};
 
 impl App {
     /// Append a new HTTP request at the workspace root, open it, and persist.
@@ -50,10 +50,7 @@ impl App {
     }
 
     /// Re-create a request from a history record (method + url) at the root and open it.
-    pub(super) fn open_history(&mut self, idx: usize) -> Task<Message> {
-        let Some(record) = self.history.records.get(idx).cloned() else {
-            return Task::none();
-        };
+    pub(super) fn open_history(&mut self, record: HistoryRecord) -> Task<Message> {
         let mut taken: HashSet<String> = self
             .workspace
             .root

@@ -20,15 +20,16 @@ pub fn view(history: &HistoryCache) -> Element<'static, Message> {
         col = col.push(text("No requests sent yet.").size(12));
         return col.into();
     }
-    // Records are stored newest-last; show the tail, newest first.
-    for (idx, record) in history.records.iter().enumerate().rev().take(SHOWN) {
+    // Records are stored newest-last; show the tail, newest first. Pass the record by value so the
+    // click is self-contained (a positional index could shift if the cap-drain runs meanwhile).
+    for record in history.records.iter().rev().take(SHOWN) {
         let label = format!("{} {}", record.method, truncate(&record.url, 40));
         col = col.push(
             button(row![text(label).size(12)])
                 .padding(4)
                 .width(Length::Fill)
                 .style(theme::flat)
-                .on_press(Message::HistoryOpen(idx)),
+                .on_press(Message::HistoryOpen(record.clone())),
         );
     }
     col.into()

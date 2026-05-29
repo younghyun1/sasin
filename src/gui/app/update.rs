@@ -255,7 +255,7 @@ impl App {
                 Task::none()
             }
             Message::SaveAsExample => self.save_as_example(),
-            Message::HistoryOpen(idx) => self.open_history(idx),
+            Message::HistoryOpen(record) => self.open_history(record),
             Message::ToggleCookieManager => {
                 self.show_cookies = !self.show_cookies;
                 Task::none()

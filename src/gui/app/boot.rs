@@ -3,7 +3,8 @@
 use std::path::Path;
 
 use crate::gui::app::App;
-use crate::model::{Folder, HttpRequest, Node, Workspace, find_node};
+use crate::gui::state::Tab;
+use crate::model::{Folder, HttpRequest, Node, NodePath, Workspace, find_node};
 use crate::storage::{load_workspace, migrate_legacy, save_workspace};
 
 impl App {
@@ -48,9 +49,37 @@ impl App {
         let root = &self.workspace.root;
         self.ws
             .retain(|rt| matches!(find_node(root, &rt.path), Some(Node::Ws(_))));
+
+        // Reseed non-dirty tabs from the reloaded nodes so their editor buffers reflect the new
+        // on-disk content. Without this the next send/save would flush the *stale* buffers back
+        // into the node via sync_body/sync_scripts, silently clobbering the external change.
+        // Tabs with unsaved edits (dirty) are left alone to preserve the user's work.
+        let to_reseed: Vec<(usize, NodePath)> = self
+            .tabs
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| !t.dirty)
+            .map(|(i, t)| (i, t.path.clone()))
+            .collect();
+        for (i, path) in to_reseed {
+            if let Some(node) = find_node(&self.workspace.root, &path) {
+                let panel = self.tabs[i].panel;
+                let mut fresh = Tab::from_node(path, node);
+                fresh.panel = panel;
+                self.tabs[i] = fresh;
+            }
+        }
+        let dirty_kept = self.tabs.iter().filter(|t| t.dirty).count();
+
         // A run in progress may reference paths that changed; close the panel to be safe.
         self.runner = None;
-        self.status = Some("Workspace reloaded from disk.".to_string());
+        self.status = Some(if dirty_kept > 0 {
+            format!(
+                "Workspace reloaded from disk ({dirty_kept} tab(s) with unsaved edits kept — they may differ from disk)."
+            )
+        } else {
+            "Workspace reloaded from disk.".to_string()
+        });
     }
 }
 

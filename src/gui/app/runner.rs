@@ -94,7 +94,13 @@ impl App {
                 }
                 self.status = Some(format!("Loaded {count} data row(s)."));
             }
-            Err(e) => self.status = Some(format!("Data file error: {e}")),
+            Err(e) => {
+                // Clear stale rows so a failed reload can't leave a previous file's data active.
+                if let Some(r) = &mut self.runner {
+                    r.data.clear();
+                }
+                self.status = Some(format!("Data file error: {e}"));
+            }
         }
     }
 
@@ -131,7 +137,14 @@ impl App {
                     resp.duration.as_millis(),
                 )
             }
-            Err(e) => (None, Some(e), Vec::new(), 0),
+            Err(e) => {
+                // Fold in a pre-request script error so it isn't lost when the send also fails.
+                let combined = match &current.pre_error {
+                    Some(pre) => format!("{pre}; {e}"),
+                    None => e,
+                };
+                (None, Some(combined), Vec::new(), 0)
+            }
         };
 
         if let Some(r) = &mut self.runner {

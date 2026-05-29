@@ -73,6 +73,22 @@ adversarial review→verify workflow pass.
   (response body is stored as `String`, so binary bodies aren't retained for display).
 - Cookie manager add/edit individual cookies (view + clear only).
 - Multi-process temp-file naming on save — low risk for a local single-process tool.
+- WebSocket `verify_tls=false` is not honoured (WS TLS is always verified); disabling it would
+  need a hand-rolled rustls dangerous verifier + crypto provider. The WS connect timeout *is*
+  applied. The HTTP path honours `verify_tls`.
+
+## P8 adversarial review
+
+A review→verify workflow (5 dimensions, findings each independently verified) confirmed 5 issues,
+all fixed before close:
+- **high** `reload_workspace` left non-dirty tab buffers stale → the next send/save flushed old
+  text back over an externally-pulled change (silent data loss). Now non-dirty tabs are reseeded
+  from the reloaded node; dirty tabs are kept and flagged.
+- **med** runner data-file reload error left stale rows active → now cleared.
+- **med** WS connect could hang forever (no timeout) → `connect_timeout_ms` now bounds it.
+- **low** runner dropped a pre-request script error when the send also failed → now combined.
+- **low** history re-open used a positional index that a cap-drain could shift → now passes the
+  record by value.
 
 ## Caveat
 

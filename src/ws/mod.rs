@@ -27,6 +27,8 @@ pub struct WsConfig {
     pub subprotocols: Vec<String>,
     /// Reconnect automatically (with backoff) after a transient drop.
     pub auto_reconnect: bool,
+    /// Connection timeout in milliseconds (a connect that exceeds this is treated as a failure).
+    pub connect_timeout_ms: u64,
 }
 
 /// A message to send on an open connection.
@@ -86,19 +88,28 @@ fn build_stream(key: &(NodePath, WsConfig)) -> EventStream {
                     return;
                 }
             };
-            match connect_async(request).await {
-                Ok((stream, _resp)) => {
+            // Bound the connect so a blackholed SYN / stalled TLS handshake cannot hang forever.
+            let timeout = Duration::from_millis(config.connect_timeout_ms.max(1));
+            match tokio::time::timeout(timeout, connect_async(request)).await {
+                Ok(Ok((stream, _resp))) => {
                     attempt = 0;
                     if !run_session(stream, &mut output, config.auto_reconnect).await {
                         let _ = output.send(WsEvent::Closed).await;
                         return;
                     }
                 }
-                Err(e) if !config.auto_reconnect => {
+                Ok(Err(e)) if !config.auto_reconnect => {
                     let _ = output.send(WsEvent::Failed(e.to_string())).await;
                     return;
                 }
-                Err(_) => {}
+                Err(_) if !config.auto_reconnect => {
+                    let _ = output
+                        .send(WsEvent::Failed("connect timed out".to_string()))
+                        .await;
+                    return;
+                }
+                // Connect failed or timed out, but auto-reconnect is on: fall through to backoff.
+                Ok(Err(_)) | Err(_) => {}
             }
             // Reconnect path: back off, then retry up to the cap.
             attempt += 1;
