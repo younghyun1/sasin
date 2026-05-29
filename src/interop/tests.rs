@@ -55,6 +55,20 @@ fn multiline_continuation_parses() -> Result<(), String> {
 }
 
 #[test]
+fn export_percent_encodes_query_params() -> Result<(), String> {
+    let mut req = from_curl("curl https://h/p")?;
+    req.params
+        .push(crate::model::KvEntry::new("q", "hello world"));
+    let curl = to_curl(&req);
+    assert!(
+        curl.contains("hello%20world") || curl.contains("hello+world"),
+        "params must be encoded: {curl}"
+    );
+    assert!(!curl.contains("q=hello world"), "raw space leaked: {curl}");
+    Ok(())
+}
+
+#[test]
 fn export_then_reimport_round_trips() -> Result<(), String> {
     let req = from_curl("curl -X PUT 'https://h/x' -H 'Accept: application/json' -d 'body'")?;
     let curl = to_curl(&req);

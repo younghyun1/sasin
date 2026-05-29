@@ -1,6 +1,6 @@
 //! Render an [`HttpRequest`] as a copy-pasteable `curl` command.
 
-use crate::model::{ApiKeyLoc, Auth, Body, FormKind, HttpRequest, KvEntry};
+use crate::model::{ApiKeyLoc, Auth, Body, FormKind, HttpRequest};
 
 /// Build a multi-line curl command for `req` (literal values; variables are not interpolated).
 pub fn to_curl(req: &HttpRequest) -> String {
@@ -9,10 +9,10 @@ pub fn to_curl(req: &HttpRequest) -> String {
     if !req.method.eq_ignore_ascii_case("GET") {
         parts.push(format!("-X {}", req.method));
     }
-    parts.push(format!(
-        "'{}'",
-        quote(&url_with_params(&req.url, &req.params))
-    ));
+    // Reuse the send path's URL builder so params are percent-encoded exactly as sent.
+    let url =
+        crate::http::exec::effective_url(&req.url, &req.params).unwrap_or_else(|_| req.url.clone());
+    parts.push(format!("'{}'", quote(&url)));
 
     for h in &req.headers {
         if h.enabled && !h.key.trim().is_empty() {
@@ -70,19 +70,6 @@ pub fn to_curl(req: &HttpRequest) -> String {
     }
 
     parts.join(" \\\n  ")
-}
-
-fn url_with_params(base: &str, params: &[KvEntry]) -> String {
-    let enabled: Vec<String> = params
-        .iter()
-        .filter(|p| p.enabled && !p.key.trim().is_empty())
-        .map(|p| format!("{}={}", p.key.trim(), p.value))
-        .collect();
-    if enabled.is_empty() {
-        return base.to_string();
-    }
-    let sep = if base.contains('?') { "&" } else { "?" };
-    format!("{base}{sep}{}", enabled.join("&"))
 }
 
 /// Escape single quotes for inclusion inside a single-quoted shell string: `'` becomes `'\''`.

@@ -1,8 +1,6 @@
-//! GUI session state: open tabs.
+//! GUI session state: open tabs, the websocket runtime, and KV-table row ops.
 //!
-//! Structured request fields (method, url, params, headers, auth, body mode, settings) are edited
-//! directly on the workspace node via the update handlers. Only the free-form body text needs a
-//! buffered [`text_editor::Content`], held here and synced into the node on edit.
+//! Structured request fields are edited directly on the node; only body/script text is buffered.
 
 use iced::futures::channel::mpsc;
 use iced::widget::text_editor;
