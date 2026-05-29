@@ -16,11 +16,16 @@ use crate::storage::layout::{
     order_nodes,
 };
 
+/// Maximum directory-nesting depth. Guards against runaway recursion (e.g. a symlink cycle, even
+/// though symlinked directories are not followed) and pathological trees. No real collection nests
+/// this deep.
+const MAX_DEPTH: u32 = 64;
+
 /// Load a workspace rooted at `dir`. Missing manifest/environments are treated as empty defaults.
 pub fn load_workspace(dir: &Path) -> StorageResult<Workspace> {
     let manifest = read_manifest(dir)?;
     let (environments, globals) = read_environments(dir)?;
-    let root = order_nodes(read_dir_nodes(dir)?, &manifest.order);
+    let root = order_nodes(read_dir_nodes(dir, 0)?, &manifest.order);
 
     // Storage mirrors the manifest faithfully — no derived values are injected. The GUI falls
     // back to the directory name for display when `name` is empty.
@@ -77,7 +82,10 @@ fn read_environments(dir: &Path) -> StorageResult<(Vec<Environment>, Vec<Variabl
     Ok((environments, globals))
 }
 
-fn read_dir_nodes(dir: &Path) -> StorageResult<Vec<Node>> {
+fn read_dir_nodes(dir: &Path, depth: u32) -> StorageResult<Vec<Node>> {
+    if depth >= MAX_DEPTH {
+        return Err(StorageError::TooDeep(dir.to_path_buf()));
+    }
     let mut nodes = Vec::new();
     for entry in fs::read_dir(dir).map_err(|e| StorageError::io(dir, e))? {
         let entry = entry.map_err(|e| StorageError::io(dir, e))?;
@@ -85,6 +93,8 @@ fn read_dir_nodes(dir: &Path) -> StorageResult<Vec<Node>> {
         let file_type = entry.file_type().map_err(|e| StorageError::io(dir, e))?;
         let path = entry.path();
 
+        // `is_dir()` is false for a symlink (even one pointing at a directory), so symlinked
+        // directories are never followed — a symlink cycle cannot recurse here.
         if file_type.is_dir() {
             if fname.starts_with('.')
                 || fname == ENV_DIR
@@ -93,7 +103,7 @@ fn read_dir_nodes(dir: &Path) -> StorageResult<Vec<Node>> {
             {
                 continue;
             }
-            nodes.push(Node::Folder(read_folder(&path, &fname)?));
+            nodes.push(Node::Folder(read_folder(&path, &fname, depth + 1)?));
         } else {
             match classify_file(&fname) {
                 EntryKind::Http(slug) => nodes.push(Node::Http(read_request(&path, &slug)?)),
@@ -105,7 +115,7 @@ fn read_dir_nodes(dir: &Path) -> StorageResult<Vec<Node>> {
     Ok(nodes)
 }
 
-fn read_folder(path: &Path, slug: &str) -> StorageResult<Folder> {
+fn read_folder(path: &Path, slug: &str, depth: u32) -> StorageResult<Folder> {
     let meta_path = path.join(FOLDER_FILE);
     let mut folder: Folder = if meta_path.exists() {
         let text = read_to_string(&meta_path)?;
@@ -115,7 +125,7 @@ fn read_folder(path: &Path, slug: &str) -> StorageResult<Folder> {
     };
 
     folder.slug = slug.to_string();
-    let children = order_nodes(read_dir_nodes(path)?, &folder.order);
+    let children = order_nodes(read_dir_nodes(path, depth)?, &folder.order);
     folder.order = Vec::new(); // order now encoded by children position
     folder.children = children;
     Ok(folder)

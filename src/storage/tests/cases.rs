@@ -195,3 +195,23 @@ fn legacy_dataset_migrates_to_tree() -> StorageResult<()> {
     let _ = fs::remove_dir_all(&dir);
     Ok(())
 }
+
+/// A pathologically deep directory tree must error rather than recurse without bound.
+#[test]
+fn excessive_nesting_is_rejected() {
+    let dir = temp_dir("too-deep");
+    let mut deep = dir.clone();
+    for i in 0..70 {
+        deep.push(format!("f{i}"));
+    }
+    if fs::create_dir_all(&deep).is_err() {
+        let _ = fs::remove_dir_all(&dir);
+        return; // filesystem refused the depth — the guard is moot here.
+    }
+    let result = load_workspace(&dir);
+    assert!(
+        matches!(result, Err(crate::storage::StorageError::TooDeep(_))),
+        "deep tree must be rejected, got {result:?}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}

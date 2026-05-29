@@ -20,6 +20,8 @@ pub enum StorageError {
     Cache(String),
     /// Legacy dataset migration failure.
     Migrate(String),
+    /// Directory nesting exceeded the recursion limit (guards against symlink cycles).
+    TooDeep(PathBuf),
 }
 
 impl StorageError {
@@ -39,6 +41,9 @@ impl fmt::Display for StorageError {
             StorageError::TomlEncode(msg) => write!(f, "failed to serialize TOML: {msg}"),
             StorageError::Cache(msg) => write!(f, "cache error: {msg}"),
             StorageError::Migrate(msg) => write!(f, "migration error: {msg}"),
+            StorageError::TooDeep(path) => {
+                write!(f, "directory nesting too deep at {}", path.display())
+            }
         }
     }
 }

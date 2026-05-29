@@ -1,8 +1,5 @@
 //! Git-native storage: map the [`crate::model`] workspace to and from a TOML directory tree,
 //! plus a derived, gitignored binary cache. See `docs/planning/02-storage-format.md`.
-//!
-//! NOTE: `allow(dead_code)` is temporary — the storage API is consumed by the GUI in phase P2.
-#![allow(dead_code)]
 
 pub mod cache;
 pub mod error;

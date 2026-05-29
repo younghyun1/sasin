@@ -3,10 +3,6 @@
 //! Pure data, no I/O and no `reqwest`/`iced` types. The [`crate::storage`] layer maps these
 //! types to and from the TOML directory tree; the [`crate::runtime`] layer resolves and executes
 //! them. See `docs/planning/02-storage-format.md` for the on-disk schema.
-//!
-//! NOTE: `allow(dead_code)` is temporary — the model is consumed by the GUI in phase P2. Remove
-//! the allow once `gui` reads/writes the workspace.
-#![allow(dead_code)]
 
 pub mod auth;
 pub mod body;
