@@ -13,7 +13,7 @@ use crate::models::ResponseModel;
 use crate::runtime;
 use crate::scripting;
 use crate::storage::layout::unique_slug;
-use crate::storage::save_workspace;
+use crate::storage::{HistoryRecord, save_workspace, write_history};
 
 impl App {
     /// Persist the whole workspace to disk on a blocking thread.
@@ -199,6 +199,10 @@ impl App {
         let request = runtime::resolve_request(&request, &ctx);
         let base_dir = self.workspace_dir.clone();
 
+        // Record the (resolved) request in persisted history.
+        self.record_history(&request.method, &request.url);
+        let history_task = self.persist_history();
+
         if let Some(abort) = self.active_abort.take() {
             abort.abort();
         }
@@ -222,7 +226,7 @@ impl App {
         });
         self.active_abort = Some(join.abort_handle());
 
-        Task::perform(
+        let send_task = Task::perform(
             async move {
                 match join.await {
                     Ok(msg) => msg,
@@ -230,6 +234,41 @@ impl App {
                 }
             },
             |msg| msg,
+        );
+        Task::batch([history_task, send_task])
+    }
+
+    /// Append a request to the in-memory history (capped, newest last).
+    pub(super) fn record_history(&mut self, method: &str, url: &str) {
+        let at_unix_ms = chrono::Utc::now().timestamp_millis().max(0) as u64;
+        self.history.records.push(HistoryRecord {
+            method: method.to_string(),
+            url: url.to_string(),
+            at_unix_ms,
+        });
+        const CAP: usize = 200;
+        let len = self.history.records.len();
+        if len > CAP {
+            self.history.records.drain(0..len - CAP);
+        }
+    }
+
+    /// Persist the history cache off-thread (errors surface to the status line).
+    pub(super) fn persist_history(&self) -> Task<Message> {
+        let dir = self.workspace_dir.clone();
+        let history = self.history.clone();
+        Task::perform(
+            async move {
+                match tokio::task::spawn_blocking(move || write_history(&dir, &history)).await {
+                    Ok(Ok(())) => None,
+                    Ok(Err(e)) => Some(e.to_string()),
+                    Err(e) => Some(e.to_string()),
+                }
+            },
+            |err| match err {
+                Some(e) => Message::Notice(format!("History save failed: {e}")),
+                None => Message::Ignore,
+            },
         )
     }
 }

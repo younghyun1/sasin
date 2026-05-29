@@ -25,6 +25,7 @@ use crate::gui::state::{Tab, WsRuntime};
 use crate::http::HttpClientConfig;
 use crate::model::{NodePath, Workspace};
 use crate::persist::{app_state_dir, default_dataset_path};
+use crate::storage::{HistoryCache, read_history};
 
 use boot::load_or_init;
 
@@ -51,6 +52,8 @@ pub struct App {
     response_search: String,
     sidebar_px: f32,
     editor_px: f32,
+    /// Persisted, recently-sent requests (newest last); shown in the sidebar.
+    history: HistoryCache,
     status: Option<String>,
 }
 
@@ -60,6 +63,7 @@ impl App {
         let dir = app_state_dir().join("workspace");
         let legacy = default_dataset_path();
         let (workspace, status) = load_or_init(&dir, &legacy);
+        let history = read_history(&dir);
         let active_env = if workspace.environments.is_empty() {
             None
         } else {
@@ -83,6 +87,7 @@ impl App {
             response_search: String::new(),
             sidebar_px: 300.0,
             editor_px: 360.0,
+            history,
             status,
         };
         (app, Task::none())

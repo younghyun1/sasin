@@ -183,8 +183,13 @@ pub enum Message {
     ResponseSearchChanged(String),
     SaveAsExample,
 
+    // --- History ---
+    HistoryOpen(usize),
+
     // --- Status / misc ---
     Notice(String),
+    /// A no-op (used by fire-and-forget tasks that produce nothing to handle).
+    Ignore,
 
     // --- Layout ---
     SplitDragged(SplitId, f32),

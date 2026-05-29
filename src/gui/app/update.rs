@@ -255,10 +255,12 @@ impl App {
                 Task::none()
             }
             Message::SaveAsExample => self.save_as_example(),
+            Message::HistoryOpen(idx) => self.open_history(idx),
             Message::Notice(text) => {
                 self.status = Some(text);
                 Task::none()
             }
+            Message::Ignore => Task::none(),
             Message::SplitDragged(id, px) => {
                 match id {
                     SplitId::Sidebar => self.sidebar_px = px.clamp(220.0, 560.0),

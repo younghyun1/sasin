@@ -47,6 +47,28 @@ impl App {
         self.save_task()
     }
 
+    /// Re-create a request from a history record (method + url) at the root and open it.
+    pub(super) fn open_history(&mut self, idx: usize) -> Task<Message> {
+        let Some(record) = self.history.records.get(idx).cloned() else {
+            return Task::none();
+        };
+        let mut taken: HashSet<String> = self
+            .workspace
+            .root
+            .iter()
+            .map(|n| n.slug().to_string())
+            .collect();
+        let slug = unique_slug("history", &mut taken);
+        let req = HttpRequest::new(slug.clone(), &record.url, &record.method, &record.url);
+        self.workspace.root.push(Node::Http(req));
+        let path = vec![slug];
+        if let Some(node) = find_node(&self.workspace.root, &path) {
+            self.tabs.push(Tab::from_node(path, node));
+            self.active = Some(self.tabs.len() - 1);
+        }
+        self.save_task()
+    }
+
     /// Close the tab at index `i`, preserving the selected tab's identity across the index shift.
     pub(super) fn close_tab(&mut self, i: usize) -> Task<Message> {
         if i >= self.tabs.len() {

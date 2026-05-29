@@ -6,7 +6,8 @@ use iced::{Element, Length};
 use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::components::{
-    ResponseView, Split, SplitAxis, editor, env_panel, runner_panel, tabs, tree, ws_console,
+    ResponseView, Split, SplitAxis, editor, env_panel, history_panel, runner_panel, tabs, tree,
+    ws_console,
 };
 use crate::gui::messages::SplitId;
 use crate::gui::state::Tab;
@@ -30,6 +31,7 @@ impl App {
                 ]
                 .spacing(6),
                 env_panel::view(&self.workspace.environments, self.active_env),
+                history_panel::view(&self.history),
                 row![
                     text_input("paste curl…", &self.curl_import_text)
                         .on_input(Message::CurlImportChanged)
