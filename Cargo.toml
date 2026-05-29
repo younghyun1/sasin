@@ -36,10 +36,16 @@ mimalloc = { version = "0.1.48", features = ["v3"] }
 reqwest = "0.12.28"
 iced = { version = "0.14.0", features = ["tokio", "advanced"] }
 
+# serde derive for the git-native workspace model
+serde = { version = "1.0.228", features = ["derive"] }
+
+# human-readable TOML workspace files (source of truth)
+toml = "0.9.8"
+
 # JSON pretty-printing for response bodies
 serde_json = { version = "1.0.146", features = ["preserve_order"] }
 
-# dataset persistence (compact + fast)
+# dataset persistence (compact + fast cache)
 bitcode = "0.6.7"
 zstd = "0.13.2"
 

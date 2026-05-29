@@ -10,9 +10,11 @@ static GLOBAL: MiMalloc = MiMalloc;
 pub mod build_info;
 pub mod gui;
 pub mod http;
+pub mod model;
 pub mod models;
 pub mod persist;
 pub mod setup_logger;
+pub mod storage;
 
 fn main() -> iced::Result {
     // These guards need to stay alive for the global logger to work.
