@@ -15,6 +15,20 @@ use crate::gui::messages::{
 use crate::gui::state::Tab;
 use crate::model::{ApiKeyLoc, Auth, Body, FormKind, FormPart, HttpRequest, RawLang};
 
+/// Editor highlight theme (light, to match iced's default light theme).
+const HL_THEME: iced::highlighter::Theme = iced::highlighter::Theme::InspiredGitHub;
+
+/// Map a raw-body language to the syntect token the highlighter resolves.
+fn syntax_token(lang: RawLang) -> &'static str {
+    match lang {
+        RawLang::Json => "json",
+        RawLang::Xml => "xml",
+        RawLang::Html => "html",
+        RawLang::Javascript => "js",
+        RawLang::Text => "txt",
+    }
+}
+
 /// Render the active panel.
 pub fn view<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
     match tab.panel {
@@ -33,12 +47,14 @@ fn scripts_panel(tab: &Tab) -> Element<'_, Message> {
         text_editor(&tab.pre_script)
             .placeholder("pm.environment.set('ts', Date.now())")
             .on_action(Message::PreScriptAction)
-            .height(Length::Fixed(150.0)),
+            .height(Length::Fixed(150.0))
+            .highlight("js", HL_THEME),
         text("Test script").size(13),
         text_editor(&tab.test_script)
             .placeholder("pm.test('status ok', () => pm.response.to.have.status(200))")
             .on_action(Message::TestScriptAction)
-            .height(Length::Fixed(150.0)),
+            .height(Length::Fixed(150.0))
+            .highlight("js", HL_THEME),
     ]
     .spacing(6)
     .width(Length::Fill)
@@ -110,7 +126,8 @@ fn body_panel<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
             text_editor(&tab.body)
                 .placeholder("Raw body…")
                 .on_action(Message::BodyAction)
-                .height(Length::Fixed(240.0)),
+                .height(Length::Fixed(240.0))
+                .highlight(syntax_token(*language), HL_THEME),
         ]
         .spacing(6)
         .into(),
@@ -132,12 +149,14 @@ fn body_panel<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
             text_editor(&tab.body)
                 .placeholder("query { … }")
                 .on_action(Message::BodyAction)
-                .height(Length::Fixed(160.0)),
+                .height(Length::Fixed(160.0))
+                .highlight("graphql", HL_THEME),
             text("Variables (JSON)").size(13),
             text_editor(&tab.gql_vars)
                 .placeholder("{}")
                 .on_action(Message::GqlVarsAction)
-                .height(Length::Fixed(100.0)),
+                .height(Length::Fixed(100.0))
+                .highlight("json", HL_THEME),
         ]
         .spacing(6)
         .into(),
