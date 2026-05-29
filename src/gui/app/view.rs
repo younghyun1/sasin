@@ -6,8 +6,8 @@ use iced::{Element, Length};
 use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::components::{
-    ResponseView, Split, SplitAxis, editor, env_panel, history_panel, runner_panel, tabs, tree,
-    ws_console,
+    ResponseView, Split, SplitAxis, cookie_manager, editor, env_panel, history_panel, runner_panel,
+    tabs, tree, ws_console,
 };
 use crate::gui::messages::SplitId;
 use crate::gui::state::Tab;
@@ -28,6 +28,9 @@ impl App {
                     button(text("Run All").size(13))
                         .padding(8)
                         .on_press(Message::OpenRunner(Vec::new())),
+                    button(text("Cookies").size(13))
+                        .padding(8)
+                        .on_press(Message::ToggleCookieManager),
                 ]
                 .spacing(6),
                 env_panel::view(&self.workspace.environments, self.active_env),
@@ -89,17 +92,20 @@ impl App {
             None => response,
         };
 
-        // The runner panel takes over the main area while a run session is open.
-        let main: Element<'_, Message> = match &self.runner {
-            Some(runner) => runner_panel::view(runner),
-            None => Split::new(SplitAxis::Vertical)
+        // The runner / cookie-manager views take over the main area when open.
+        let main: Element<'_, Message> = if self.show_cookies {
+            cookie_manager::view(&self.http_config.jar.snapshot())
+        } else if let Some(runner) = &self.runner {
+            runner_panel::view(runner)
+        } else {
+            Split::new(SplitAxis::Vertical)
                 .first(editor_area)
                 .second(response_pane)
                 .split_px(self.editor_px)
                 .min_first_px(220.0)
                 .min_second_px(160.0)
                 .on_drag(|px| Message::SplitDragged(SplitId::RequestResponse, px))
-                .into(),
+                .into()
         };
 
         let content: Element<'_, Message> = Split::new(SplitAxis::Horizontal)

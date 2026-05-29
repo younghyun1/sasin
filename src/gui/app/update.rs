@@ -256,6 +256,15 @@ impl App {
             }
             Message::SaveAsExample => self.save_as_example(),
             Message::HistoryOpen(idx) => self.open_history(idx),
+            Message::ToggleCookieManager => {
+                self.show_cookies = !self.show_cookies;
+                Task::none()
+            }
+            Message::ClearCookies => {
+                self.http_config.jar.clear();
+                self.status = Some("Cookies cleared.".to_string());
+                Task::none()
+            }
             Message::Notice(text) => {
                 self.status = Some(text);
                 Task::none()

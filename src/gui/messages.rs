@@ -186,6 +186,10 @@ pub enum Message {
     // --- History ---
     HistoryOpen(usize),
 
+    // --- Cookie manager ---
+    ToggleCookieManager,
+    ClearCookies,
+
     // --- Status / misc ---
     Notice(String),
     /// A no-op (used by fire-and-forget tasks that produce nothing to handle).

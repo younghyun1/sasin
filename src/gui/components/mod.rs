@@ -2,6 +2,7 @@
 //!
 //! `tree`, `tabs`, and `editor` are free-function view modules; the rest are builder types.
 
+pub mod cookie_manager;
 pub mod editor;
 pub mod env_panel;
 pub mod history_panel;

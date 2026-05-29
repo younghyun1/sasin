@@ -58,8 +58,13 @@ fn build_client(
         } else {
             reqwest::redirect::Policy::none()
         })
-        .danger_accept_invalid_certs(!s.verify_tls)
-        .cookie_store(s.use_cookie_jar);
+        .danger_accept_invalid_certs(!s.verify_tls);
+
+    // Use the session-wide jar so cookies persist across requests (reqwest's per-client
+    // `cookie_store` would be discarded with the client built per send).
+    if s.use_cookie_jar {
+        builder = builder.cookie_provider(std::sync::Arc::new(config.jar.clone()));
+    }
 
     if let Some(ua) = &config.user_agent {
         builder = builder.user_agent(ua.clone());

@@ -6,10 +6,12 @@
 pub mod auth;
 pub mod body;
 pub mod client;
+pub mod cookies;
 pub mod exec;
 
 #[cfg(test)]
 mod tests;
 
 pub use client::HttpClientConfig;
+pub use cookies::{CookieView, SharedCookieJar};
 pub use exec::execute;

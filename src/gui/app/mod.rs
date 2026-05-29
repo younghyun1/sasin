@@ -50,6 +50,8 @@ pub struct App {
     pretty_json: bool,
     response_tab: crate::gui::messages::ResponseTab,
     response_search: String,
+    /// Whether the cookie-manager view occupies the main area.
+    show_cookies: bool,
     sidebar_px: f32,
     editor_px: f32,
     /// Persisted, recently-sent requests (newest last); shown in the sidebar.
@@ -85,6 +87,7 @@ impl App {
             pretty_json: true,
             response_tab: crate::gui::messages::ResponseTab::Body,
             response_search: String::new(),
+            show_cookies: false,
             sidebar_px: 300.0,
             editor_px: 360.0,
             history,
