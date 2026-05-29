@@ -18,7 +18,10 @@ impl App {
     /// Open the runner for the folder at `path` (empty path = the whole workspace root).
     pub(super) fn open_runner(&mut self, path: NodePath) {
         let (requests, name) = if path.is_empty() {
-            (flatten_requests(&self.workspace.root, &path), "Workspace".to_string())
+            (
+                flatten_requests(&self.workspace.root, &path),
+                "Workspace".to_string(),
+            )
         } else {
             match find_node(&self.workspace.root, &path) {
                 Some(Node::Folder(f)) => {
@@ -38,8 +41,18 @@ impl App {
     /// Build the plan from the current config and kick off the first send.
     pub(super) fn runner_start(&mut self) -> Task<Message> {
         if let Some(r) = &mut self.runner {
-            let iterations = r.iterations_text.trim().parse::<usize>().unwrap_or(1).max(1);
-            r.plan = RunPlan::new(r.root.clone(), r.requests.clone(), iterations, r.data.clone());
+            let iterations = r
+                .iterations_text
+                .trim()
+                .parse::<usize>()
+                .unwrap_or(1)
+                .max(1);
+            r.plan = RunPlan::new(
+                r.root.clone(),
+                r.requests.clone(),
+                iterations,
+                r.data.clone(),
+            );
             r.report = crate::runner::RunReport::default();
             r.cursor = 0;
             r.running = true;

@@ -74,10 +74,7 @@ pub fn view(runner: &RunnerState) -> Element<'_, Message> {
 
     let mut list = column![].spacing(3).width(Length::Fill);
     if report.outcomes.is_empty() {
-        list = list.push(
-            text("No results yet. Configure iterations / data, then Run.")
-                .size(13),
-        );
+        list = list.push(text("No results yet. Configure iterations / data, then Run.").size(13));
     }
     for outcome in &report.outcomes {
         list = list.push(outcome_row(outcome));

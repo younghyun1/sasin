@@ -1,16 +1,12 @@
 //! Central message dispatch for [`App`]. Thin arms delegate to handlers in the sibling modules.
 
-use std::collections::HashSet;
-
 use iced::Task;
 
 use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::messages::SplitId;
 use crate::gui::state::Tab;
-use crate::model::{HttpRequest, Node, find_node, remove_node};
-use crate::storage::delete_node;
-use crate::storage::layout::unique_slug;
+use crate::model::{Node, find_node};
 
 impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -32,37 +28,8 @@ impl App {
                 }
                 Task::none()
             }
-            Message::NewRequest => {
-                let mut taken: HashSet<String> = self
-                    .workspace
-                    .root
-                    .iter()
-                    .map(|n| n.slug().to_string())
-                    .collect();
-                let slug = unique_slug("new-request", &mut taken);
-                let req = HttpRequest::new(slug.clone(), "New Request", "GET", "https://");
-                self.workspace.root.push(Node::Http(req));
-                let path = vec![slug];
-                if let Some(node) = find_node(&self.workspace.root, &path) {
-                    self.tabs.push(Tab::from_node(path, node));
-                    self.active = Some(self.tabs.len() - 1);
-                }
-                self.save_task()
-            }
-            Message::DeleteNode(path) => {
-                // Keep the active selection pinned to its tab across the removal.
-                let active_path = self
-                    .active
-                    .and_then(|a| self.tabs.get(a))
-                    .map(|t| t.path.clone());
-                self.tabs.retain(|t| !t.path.starts_with(&path));
-                remove_node(&mut self.workspace.root, &path);
-                if let Err(e) = delete_node(&self.workspace_dir, &path) {
-                    self.status = Some(format!("Delete failed: {e}"));
-                }
-                self.active = active_path.and_then(|p| self.tabs.iter().position(|t| t.path == p));
-                self.save_task()
-            }
+            Message::NewRequest => self.new_request(),
+            Message::DeleteNode(path) => self.delete_path(path),
             Message::SelectEnv(idx) => {
                 self.select_env(idx);
                 Task::none()
@@ -145,30 +112,7 @@ impl App {
                 }
                 Task::none()
             }
-            Message::CloseTab(i) => {
-                if i >= self.tabs.len() {
-                    return Task::none();
-                }
-                let dirty = self.tabs[i].dirty;
-                self.tabs.remove(i);
-                // Preserve the selected tab's identity across the index shift.
-                self.active = if self.tabs.is_empty() {
-                    None
-                } else if let Some(a) = self.active {
-                    if a > i {
-                        Some(a - 1)
-                    } else {
-                        Some(a.min(self.tabs.len() - 1))
-                    }
-                } else {
-                    None
-                };
-                if dirty {
-                    self.save_task()
-                } else {
-                    Task::none()
-                }
-            }
+            Message::CloseTab(i) => self.close_tab(i),
             Message::MethodChanged(method) => {
                 self.set_method(method);
                 Task::none()

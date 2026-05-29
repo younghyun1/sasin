@@ -8,6 +8,7 @@ mod boot;
 mod commands;
 mod edit;
 mod edit_body;
+mod nav;
 mod runner;
 mod update;
 mod view;
