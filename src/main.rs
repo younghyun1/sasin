@@ -18,6 +18,7 @@ pub mod runtime;
 pub mod scripting;
 pub mod setup_logger;
 pub mod storage;
+pub mod ws;
 
 fn main() -> iced::Result {
     // These guards need to stay alive for the global logger to work.
@@ -38,5 +39,6 @@ fn main() -> iced::Result {
         crate::gui::App::view,
     )
     .title(crate::gui::App::title)
+    .subscription(crate::gui::App::subscription)
     .run()
 }

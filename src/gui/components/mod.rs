@@ -10,6 +10,7 @@ pub mod section;
 pub mod split;
 pub mod tabs;
 pub mod tree;
+pub mod ws_console;
 
 pub use response_view::ResponseView;
 pub use section::Section;

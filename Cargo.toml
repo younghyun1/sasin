@@ -60,6 +60,9 @@ rfd = "0.15.2"
 # embedded JS engine for pm.* scripting (feature-gated; needs a C toolchain to build)
 rquickjs = { version = "0.9", optional = true }
 
+# WebSocket client (raw ws/wss) with rustls + bundled roots
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+
 [features]
 # Scripting is on by default (the build already needs a C toolchain for zstd/quickjs).
 # Disable with `--no-default-features` to drop the rquickjs dependency.

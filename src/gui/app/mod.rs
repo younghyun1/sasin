@@ -8,6 +8,7 @@ mod boot;
 mod commands;
 mod edit;
 mod view;
+mod ws;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -16,7 +17,7 @@ use iced::Task;
 
 use crate::gui::Message;
 use crate::gui::messages::SplitId;
-use crate::gui::state::Tab;
+use crate::gui::state::{Tab, WsRuntime};
 use crate::http::HttpClientConfig;
 use crate::model::{HttpRequest, Node, NodePath, Workspace, find_node, remove_node};
 use crate::persist::{app_state_dir, default_dataset_path};
@@ -36,6 +37,8 @@ pub struct App {
     active_env: Option<usize>,
     /// Buffer for the "import from curl" box.
     curl_import_text: String,
+    /// The single active websocket session, if any.
+    ws: Option<WsRuntime>,
     http_config: HttpClientConfig,
     send_gen: u64,
     active_abort: Option<tokio::task::AbortHandle>,
@@ -65,6 +68,7 @@ impl App {
             active: None,
             active_env,
             curl_import_text: String::new(),
+            ws: None,
             http_config: HttpClientConfig::default(),
             send_gen: 0,
             active_abort: None,
@@ -155,6 +159,34 @@ impl App {
             }
             Message::CurlImport => self.import_curl(),
             Message::CopyAsCurl => self.copy_as_curl(),
+            Message::Ws(event) => {
+                self.ws_event(event);
+                Task::none()
+            }
+            Message::WsConnect => {
+                self.ws_connect();
+                Task::none()
+            }
+            Message::WsDisconnect => {
+                self.ws_disconnect();
+                Task::none()
+            }
+            Message::WsComposerChanged(text) => {
+                self.ws_composer_changed(text);
+                Task::none()
+            }
+            Message::WsKindChanged(kind) => {
+                self.ws_kind_changed(kind);
+                Task::none()
+            }
+            Message::WsSend => {
+                self.ws_send();
+                Task::none()
+            }
+            Message::WsSendSaved(idx) => {
+                self.ws_send_saved(idx);
+                Task::none()
+            }
             Message::SelectTab(i) => {
                 if i < self.tabs.len() {
                     self.active = Some(i);

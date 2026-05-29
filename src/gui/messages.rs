@@ -4,8 +4,9 @@ use std::fmt;
 
 use iced::widget::text_editor;
 
-use crate::model::{NodePath, RawLang};
+use crate::model::{NodePath, RawLang, WsKind};
 use crate::models::{HttpMethod, ResponseModel};
+use crate::ws::WsEvent;
 
 /// Monotonic id used to drop stale in-flight send results.
 pub type SendGen = u64;
@@ -104,6 +105,15 @@ pub enum Message {
     CurlImportChanged(String),
     CurlImport,
     CopyAsCurl,
+
+    // --- WebSocket ---
+    Ws(WsEvent),
+    WsConnect,
+    WsDisconnect,
+    WsComposerChanged(String),
+    WsKindChanged(WsKind),
+    WsSend,
+    WsSendSaved(usize),
 
     // --- Tabs ---
     SelectTab(usize),

@@ -5,7 +5,9 @@ use iced::{Element, Length};
 
 use crate::gui::Message;
 use crate::gui::app::App;
-use crate::gui::components::{ResponseView, Split, SplitAxis, editor, env_panel, tabs, tree};
+use crate::gui::components::{
+    ResponseView, Split, SplitAxis, editor, env_panel, tabs, tree, ws_console,
+};
 use crate::gui::messages::SplitId;
 use crate::gui::state::Tab;
 use crate::gui::theme;
@@ -47,13 +49,10 @@ impl App {
             Some(tab) => {
                 let panel: Element<'_, Message> = match find_node(&self.workspace.root, &tab.path) {
                     Some(Node::Http(req)) => editor::view(req, tab),
-                    Some(Node::Ws(_)) => container(
-                        text("WebSocket sessions are interactive — console arrives in P7.")
-                            .size(14),
-                    )
-                    .padding(20)
-                    .center_x(Length::Fill)
-                    .into(),
+                    Some(Node::Ws(req)) => {
+                        let rt = self.ws.as_ref().filter(|r| r.path == tab.path);
+                        ws_console::view(req, rt)
+                    }
                     _ => container(text("Not editable.").size(14)).padding(20).into(),
                 };
                 column![tab_bar, panel].spacing(6).into()

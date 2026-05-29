@@ -4,12 +4,14 @@
 //! directly on the workspace node via the update handlers. Only the free-form body text needs a
 //! buffered [`text_editor::Content`], held here and synced into the node on edit.
 
+use iced::futures::channel::mpsc;
 use iced::widget::text_editor;
 
 use crate::gui::messages::{EditorPanel, KvOp};
-use crate::model::{Body, FormKind, FormPart, KvEntry, Node, NodePath, Variable};
+use crate::model::{Body, FormKind, FormPart, KvEntry, Node, NodePath, Variable, WsKind};
 use crate::models::ResponseModel;
 use crate::scripting::TestResult;
+use crate::ws::{WsCommand, WsConfig};
 
 /// What a tab is editing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -117,6 +119,62 @@ pub fn sync_body(tab: &Tab, node: &mut Node) {
             }
             _ => {}
         }
+    }
+}
+
+/// Direction of a websocket transcript line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WsDir {
+    In,
+    Out,
+    Info,
+}
+
+/// One websocket transcript entry.
+#[derive(Debug, Clone)]
+pub struct WsLine {
+    pub dir: WsDir,
+    pub text: String,
+}
+
+/// Live state for the single active websocket session.
+#[derive(Debug)]
+pub struct WsRuntime {
+    pub path: NodePath,
+    pub config: WsConfig,
+    /// While true the app keeps returning the connection subscription.
+    pub active: bool,
+    pub connected: bool,
+    pub out: Option<mpsc::Sender<WsCommand>>,
+    pub transcript: Vec<WsLine>,
+    pub composer: String,
+    pub kind: WsKind,
+    pub error: Option<String>,
+}
+
+impl WsRuntime {
+    pub fn new(path: NodePath, config: WsConfig) -> Self {
+        Self {
+            path,
+            config,
+            active: true,
+            connected: false,
+            out: None,
+            transcript: vec![WsLine {
+                dir: WsDir::Info,
+                text: "Connecting…".to_string(),
+            }],
+            composer: String::new(),
+            kind: WsKind::Text,
+            error: None,
+        }
+    }
+
+    pub fn log(&mut self, dir: WsDir, text: impl Into<String>) {
+        self.transcript.push(WsLine {
+            dir,
+            text: text.into(),
+        });
     }
 }
 

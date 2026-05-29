@@ -20,6 +20,26 @@ pub enum WsKind {
     Json,
 }
 
+impl WsKind {
+    pub const fn all() -> &'static [WsKind] {
+        &[WsKind::Text, WsKind::Binary, WsKind::Json]
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            WsKind::Text => "Text",
+            WsKind::Binary => "Binary",
+            WsKind::Json => "JSON",
+        }
+    }
+}
+
+impl std::fmt::Display for WsKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
 /// A saved outbound message that can be replayed during a session.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WsMessageTemplate {
