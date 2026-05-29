@@ -2,8 +2,53 @@
 
 use std::path::Path;
 
-use crate::model::{Folder, HttpRequest, Node, Workspace};
+use crate::gui::app::App;
+use crate::model::{Folder, HttpRequest, Node, Workspace, find_node};
 use crate::storage::{load_workspace, migrate_legacy, save_workspace};
+
+impl App {
+    /// Reload the workspace from disk after an external change (e.g. a git pull or branch switch).
+    ///
+    /// The reload is applied only when the on-disk tree actually differs from what is in memory,
+    /// so our own saves — which write exactly what is in memory — never trigger a reload loop.
+    /// Tabs whose node has disappeared are closed; surviving tabs keep their buffers.
+    pub(super) fn reload_workspace(&mut self) {
+        let loaded = match load_workspace(&self.workspace_dir) {
+            Ok(ws) => ws,
+            Err(_) => return,
+        };
+        if loaded == self.workspace {
+            return;
+        }
+        self.workspace = loaded;
+
+        let active_path = self
+            .active
+            .and_then(|a| self.tabs.get(a))
+            .map(|t| t.path.clone());
+        let root = &self.workspace.root;
+        self.tabs
+            .retain(|t| matches!(find_node(root, &t.path), Some(Node::Http(_) | Node::Ws(_))));
+        self.active = match active_path.and_then(|p| self.tabs.iter().position(|t| t.path == p)) {
+            Some(i) => Some(i),
+            None if self.tabs.is_empty() => None,
+            None => Some(0),
+        };
+        if self
+            .active_env
+            .is_some_and(|i| i >= self.workspace.environments.len())
+        {
+            self.active_env = if self.workspace.environments.is_empty() {
+                None
+            } else {
+                Some(0)
+            };
+        }
+        // A run in progress may reference paths that changed; close the panel to be safe.
+        self.runner = None;
+        self.status = Some("Workspace reloaded from disk.".to_string());
+    }
+}
 
 /// Resolve the workspace at startup. Returns the workspace and an optional status note.
 pub(super) fn load_or_init(dir: &Path, legacy: &Path) -> (Workspace, Option<String>) {

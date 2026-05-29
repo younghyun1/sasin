@@ -265,6 +265,10 @@ impl App {
                 self.status = Some("Cookies cleared.".to_string());
                 Task::none()
             }
+            Message::WorkspaceChanged => {
+                self.reload_workspace();
+                Task::none()
+            }
             Message::Notice(text) => {
                 self.status = Some(text);
                 Task::none()

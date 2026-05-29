@@ -190,6 +190,10 @@ pub enum Message {
     ToggleCookieManager,
     ClearCookies,
 
+    // --- Filesystem watch ---
+    /// The workspace directory changed on disk (e.g. git pull); reload if it differs.
+    WorkspaceChanged,
+
     // --- Status / misc ---
     Notice(String),
     /// A no-op (used by fire-and-forget tasks that produce nothing to handle).

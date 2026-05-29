@@ -19,6 +19,7 @@ pub mod runtime;
 pub mod scripting;
 pub mod setup_logger;
 pub mod storage;
+pub mod watch;
 pub mod ws;
 
 fn main() -> iced::Result {

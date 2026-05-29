@@ -10,12 +10,15 @@ use crate::runtime;
 use crate::ws::{self, WsCommand, WsConfig, WsEvent, WsIncoming, WsOutgoing};
 
 impl App {
-    /// The connection subscription for the active session (none unless connecting).
+    /// All live subscriptions: the active websocket session (if any) and the workspace file watch.
     pub fn subscription(&self) -> Subscription<Message> {
-        match &self.ws {
+        let ws_sub = match &self.ws {
             Some(rt) if rt.active => ws::connect(&rt.config).map(Message::Ws),
             _ => Subscription::none(),
-        }
+        };
+        let watch_sub =
+            crate::watch::watch(&self.workspace_dir).map(|()| Message::WorkspaceChanged);
+        Subscription::batch([ws_sub, watch_sub])
     }
 
     /// Open a connection for the active websocket tab.
