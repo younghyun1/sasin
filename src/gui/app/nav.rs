@@ -39,6 +39,8 @@ impl App {
             .and_then(|a| self.tabs.get(a))
             .map(|t| t.path.clone());
         self.tabs.retain(|t| !t.path.starts_with(&path));
+        // Tear down any websocket sessions under the removed subtree.
+        self.ws.retain(|rt| !rt.path.starts_with(&path));
         remove_node(&mut self.workspace.root, &path);
         if let Err(e) = delete_node(&self.workspace_dir, &path) {
             self.status = Some(format!("Delete failed: {e}"));

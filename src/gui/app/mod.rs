@@ -40,8 +40,8 @@ pub struct App {
     active_env: Option<usize>,
     /// Buffer for the "import from curl" box.
     curl_import_text: String,
-    /// The single active websocket session, if any.
-    ws: Option<WsRuntime>,
+    /// Concurrent websocket sessions, keyed by node path.
+    ws: Vec<WsRuntime>,
     /// The active collection-runner session, if any.
     runner: Option<RunnerState>,
     http_config: HttpClientConfig,
@@ -79,7 +79,7 @@ impl App {
             active: None,
             active_env,
             curl_import_text: String::new(),
-            ws: None,
+            ws: Vec::new(),
             runner: None,
             http_config: HttpClientConfig::default(),
             send_gen: 0,

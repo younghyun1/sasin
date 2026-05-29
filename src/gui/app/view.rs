@@ -62,7 +62,7 @@ impl App {
                 let panel: Element<'_, Message> = match find_node(&self.workspace.root, &tab.path) {
                     Some(Node::Http(req)) => editor::view(req, tab),
                     Some(Node::Ws(req)) => {
-                        let rt = self.ws.as_ref().filter(|r| r.path == tab.path);
+                        let rt = self.ws.iter().find(|r| r.path == tab.path);
                         ws_console::view(req, rt)
                     }
                     _ => container(text("Not editable.").size(14)).padding(20).into(),

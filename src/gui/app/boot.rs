@@ -44,6 +44,10 @@ impl App {
                 Some(0)
             };
         }
+        // Drop websocket sessions whose node disappeared.
+        let root = &self.workspace.root;
+        self.ws
+            .retain(|rt| matches!(find_node(root, &rt.path), Some(Node::Ws(_))));
         // A run in progress may reference paths that changed; close the panel to be safe.
         self.runner = None;
         self.status = Some("Workspace reloaded from disk.".to_string());

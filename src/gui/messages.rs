@@ -115,8 +115,8 @@ pub enum Message {
     CurlImport,
     CopyAsCurl,
 
-    // --- WebSocket ---
-    Ws(WsEvent),
+    // --- WebSocket (NodePath identifies the session) ---
+    Ws(NodePath, WsEvent),
     WsConnect,
     WsDisconnect,
     WsComposerChanged(String),

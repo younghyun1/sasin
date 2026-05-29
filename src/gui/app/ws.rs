@@ -5,23 +5,37 @@ use iced::Subscription;
 use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::state::{WsDir, WsRuntime};
-use crate::model::{ApiKeyLoc, Auth, Node, WsKind, WsRequest, find_node, resolve_auth};
+use crate::model::{ApiKeyLoc, Auth, Node, NodePath, WsKind, WsRequest, find_node, resolve_auth};
 use crate::runtime;
 use crate::ws::{self, WsCommand, WsConfig, WsEvent, WsIncoming, WsOutgoing};
 
 impl App {
-    /// All live subscriptions: the active websocket session (if any) and the workspace file watch.
+    /// All live subscriptions: every active websocket session plus the workspace file watch.
     pub fn subscription(&self) -> Subscription<Message> {
-        let ws_sub = match &self.ws {
-            Some(rt) if rt.active => ws::connect(&rt.config).map(Message::Ws),
-            _ => Subscription::none(),
-        };
-        let watch_sub =
-            crate::watch::watch(&self.workspace_dir).map(|()| Message::WorkspaceChanged);
-        Subscription::batch([ws_sub, watch_sub])
+        let mut subs: Vec<Subscription<Message>> = self
+            .ws
+            .iter()
+            .filter(|rt| rt.active)
+            .map(|rt| {
+                ws::connect(rt.path.clone(), rt.config.clone())
+                    .map(|(path, event)| Message::Ws(path, event))
+            })
+            .collect();
+        subs.push(crate::watch::watch(&self.workspace_dir).map(|()| Message::WorkspaceChanged));
+        Subscription::batch(subs)
     }
 
-    /// Open a connection for the active websocket tab.
+    /// The session bound to the active tab, if any.
+    fn active_ws_mut(&mut self) -> Option<&mut WsRuntime> {
+        let path = self
+            .active
+            .and_then(|i| self.tabs.get(i))
+            .map(|t| &t.path)?;
+        let path = path.clone();
+        self.ws.iter_mut().find(|rt| rt.path == path)
+    }
+
+    /// Open (or restart) a connection for the active websocket tab.
     pub(super) fn ws_connect(&mut self) {
         let Some(i) = self.active else {
             return;
@@ -37,11 +51,13 @@ impl App {
             .and_then(|idx| self.workspace.environments.get(idx));
         let ctx = runtime::VarContext::from_scopes(&self.workspace.globals, env);
         let config = build_config(&req, &auth, &ctx);
-        self.ws = Some(WsRuntime::new(path, config));
+        // Replace any prior session for this node, then start a fresh one.
+        self.ws.retain(|rt| rt.path != path);
+        self.ws.push(WsRuntime::new(path, config));
     }
 
     pub(super) fn ws_disconnect(&mut self) {
-        if let Some(rt) = &mut self.ws {
+        if let Some(rt) = self.active_ws_mut() {
             if let Some(out) = &mut rt.out {
                 let _ = out.try_send(WsCommand::Close);
             }
@@ -51,8 +67,8 @@ impl App {
         }
     }
 
-    pub(super) fn ws_event(&mut self, event: WsEvent) {
-        let Some(rt) = &mut self.ws else {
+    pub(super) fn ws_event(&mut self, path: NodePath, event: WsEvent) {
+        let Some(rt) = self.ws.iter_mut().find(|rt| rt.path == path) else {
             return;
         };
         match event {
@@ -62,6 +78,11 @@ impl App {
                 rt.log(WsDir::Info, "Connected.");
             }
             WsEvent::Received(inc) => rt.log(WsDir::In, incoming_text(&inc)),
+            WsEvent::Reconnecting(attempt) => {
+                rt.connected = false;
+                rt.out = None;
+                rt.log(WsDir::Info, format!("Reconnecting (attempt {attempt})…"));
+            }
             WsEvent::Failed(e) => {
                 rt.connected = false;
                 rt.active = false;
@@ -77,19 +98,19 @@ impl App {
     }
 
     pub(super) fn ws_composer_changed(&mut self, text: String) {
-        if let Some(rt) = &mut self.ws {
+        if let Some(rt) = self.active_ws_mut() {
             rt.composer = text;
         }
     }
 
     pub(super) fn ws_kind_changed(&mut self, kind: WsKind) {
-        if let Some(rt) = &mut self.ws {
+        if let Some(rt) = self.active_ws_mut() {
             rt.kind = kind;
         }
     }
 
     pub(super) fn ws_send(&mut self) {
-        if let Some(rt) = &mut self.ws
+        if let Some(rt) = self.active_ws_mut()
             && !rt.composer.is_empty()
         {
             let text = std::mem::take(&mut rt.composer);
@@ -98,15 +119,16 @@ impl App {
     }
 
     pub(super) fn ws_send_saved(&mut self, idx: usize) {
-        let path = match &self.ws {
-            Some(rt) => rt.path.clone(),
+        let path = match self.active.and_then(|i| self.tabs.get(i)) {
+            Some(tab) => tab.path.clone(),
             None => return,
         };
         let message = match find_node(&self.workspace.root, &path) {
             Some(Node::Ws(w)) => w.messages.get(idx).cloned(),
             _ => None,
         };
-        if let (Some(message), Some(rt)) = (message, &mut self.ws) {
+        if let (Some(message), Some(rt)) = (message, self.ws.iter_mut().find(|rt| rt.path == path))
+        {
             rt.kind = message.kind;
             send_line(rt, message.content);
         }
@@ -179,5 +201,6 @@ fn build_config(req: &WsRequest, auth: &Auth, ctx: &runtime::VarContext) -> WsCo
         url,
         headers,
         subprotocols,
+        auto_reconnect: req.settings.auto_reconnect,
     }
 }
