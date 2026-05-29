@@ -108,9 +108,15 @@ fn folder_row(
         .padding(6)
         .width(Length::Fill)
         .style(theme::flat)
-        .on_press(Message::ToggleFolder(path));
+        .on_press(Message::ToggleFolder(path.clone()));
 
-    row![indent(depth), label].spacing(0).into()
+    // Run the folder as a collection.
+    let run = button(text("▶").size(11))
+        .padding(4)
+        .style(theme::flat)
+        .on_press(Message::OpenRunner(path));
+
+    row![indent(depth), label, run].spacing(4).into()
 }
 
 fn leaf_row(

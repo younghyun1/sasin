@@ -109,6 +109,36 @@ impl App {
                 self.ws_send_saved(idx);
                 Task::none()
             }
+            Message::OpenRunner(path) => {
+                self.open_runner(path);
+                Task::none()
+            }
+            Message::RunnerClose => {
+                self.runner = None;
+                Task::none()
+            }
+            Message::RunnerIterations(text) => {
+                if let Some(r) = &mut self.runner {
+                    r.iterations_text = text;
+                }
+                Task::none()
+            }
+            Message::RunnerDataPathChanged(text) => {
+                if let Some(r) = &mut self.runner {
+                    r.data_path = text;
+                }
+                Task::none()
+            }
+            Message::RunnerLoadData => {
+                self.load_runner_data();
+                Task::none()
+            }
+            Message::RunnerStart => self.runner_start(),
+            Message::RunnerStop => {
+                self.runner_stop();
+                Task::none()
+            }
+            Message::RunnerFinished(send_id, result) => self.runner_finished(send_id, result),
             Message::SelectTab(i) => {
                 if i < self.tabs.len() {
                     self.active = Some(i);

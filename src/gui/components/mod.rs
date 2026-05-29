@@ -6,6 +6,7 @@ pub mod editor;
 pub mod env_panel;
 pub mod kv_table;
 pub mod response_view;
+pub mod runner_panel;
 pub mod section;
 pub mod split;
 pub mod tabs;

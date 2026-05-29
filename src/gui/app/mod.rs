@@ -8,6 +8,7 @@ mod boot;
 mod commands;
 mod edit;
 mod edit_body;
+mod runner;
 mod update;
 mod view;
 mod ws;
@@ -18,6 +19,7 @@ use std::path::PathBuf;
 use iced::Task;
 
 use crate::gui::Message;
+use crate::gui::runner_state::RunnerState;
 use crate::gui::state::{Tab, WsRuntime};
 use crate::http::HttpClientConfig;
 use crate::model::{NodePath, Workspace};
@@ -38,6 +40,8 @@ pub struct App {
     curl_import_text: String,
     /// The single active websocket session, if any.
     ws: Option<WsRuntime>,
+    /// The active collection-runner session, if any.
+    runner: Option<RunnerState>,
     http_config: HttpClientConfig,
     send_gen: u64,
     active_abort: Option<tokio::task::AbortHandle>,
@@ -68,6 +72,7 @@ impl App {
             active_env,
             curl_import_text: String::new(),
             ws: None,
+            runner: None,
             http_config: HttpClientConfig::default(),
             send_gen: 0,
             active_abort: None,

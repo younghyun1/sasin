@@ -115,6 +115,16 @@ pub enum Message {
     WsSend,
     WsSendSaved(usize),
 
+    // --- Collection runner ---
+    OpenRunner(NodePath),
+    RunnerClose,
+    RunnerIterations(String),
+    RunnerDataPathChanged(String),
+    RunnerLoadData,
+    RunnerStart,
+    RunnerStop,
+    RunnerFinished(SendGen, Result<ResponseModel, String>),
+
     // --- Tabs ---
     SelectTab(usize),
     CloseTab(usize),

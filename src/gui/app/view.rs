@@ -6,7 +6,7 @@ use iced::{Element, Length};
 use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::components::{
-    ResponseView, Split, SplitAxis, editor, env_panel, tabs, tree, ws_console,
+    ResponseView, Split, SplitAxis, editor, env_panel, runner_panel, tabs, tree, ws_console,
 };
 use crate::gui::messages::SplitId;
 use crate::gui::state::Tab;
@@ -19,9 +19,16 @@ impl App {
         let sidebar = container(
             column![
                 tree::view(&self.workspace, &self.expanded, selected),
-                button(text("New Request").size(13))
-                    .padding(8)
-                    .on_press(Message::NewRequest),
+                row![
+                    button(text("New Request").size(13))
+                        .padding(8)
+                        .width(Length::Fill)
+                        .on_press(Message::NewRequest),
+                    button(text("Run All").size(13))
+                        .padding(8)
+                        .on_press(Message::OpenRunner(Vec::new())),
+                ]
+                .spacing(6),
                 env_panel::view(&self.workspace.environments, self.active_env),
                 row![
                     text_input("paste curl…", &self.curl_import_text)
@@ -81,14 +88,18 @@ impl App {
             None => response,
         };
 
-        let main: Element<'_, Message> = Split::new(SplitAxis::Vertical)
-            .first(editor_area)
-            .second(response_pane)
-            .split_px(self.editor_px)
-            .min_first_px(220.0)
-            .min_second_px(160.0)
-            .on_drag(|px| Message::SplitDragged(SplitId::RequestResponse, px))
-            .into();
+        // The runner panel takes over the main area while a run session is open.
+        let main: Element<'_, Message> = match &self.runner {
+            Some(runner) => runner_panel::view(runner),
+            None => Split::new(SplitAxis::Vertical)
+                .first(editor_area)
+                .second(response_pane)
+                .split_px(self.editor_px)
+                .min_first_px(220.0)
+                .min_second_px(160.0)
+                .on_drag(|px| Message::SplitDragged(SplitId::RequestResponse, px))
+                .into(),
+        };
 
         let content: Element<'_, Message> = Split::new(SplitAxis::Horizontal)
             .first(sidebar)
