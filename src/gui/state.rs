@@ -1,9 +1,14 @@
-//! GUI session state: open tabs and the glue between editor buffers and the workspace model.
+//! GUI session state: open tabs.
+//!
+//! Structured request fields (method, url, params, headers, auth, body mode, settings) are edited
+//! directly on the workspace node via the update handlers. Only the free-form body text needs a
+//! buffered [`text_editor::Content`], held here and synced into the node on edit.
 
 use iced::widget::text_editor;
 
-use crate::model::{Body, KvEntry, Node, NodePath, RawLang};
-use crate::models::{HttpMethod, ResponseModel};
+use crate::gui::messages::{EditorPanel, KvOp};
+use crate::model::{Body, FormKind, FormPart, KvEntry, Node, NodePath};
+use crate::models::ResponseModel;
 
 /// What a tab is editing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,22 +17,19 @@ pub enum TabKind {
     Ws,
 }
 
-/// An open editor tab bound to a node by its path. Editor buffers live here; the workspace tree
-/// is updated from them on save (and read into them on open).
+/// An open editor tab bound to a node by its path.
 #[derive(Debug)]
 pub struct Tab {
     pub path: NodePath,
     pub kind: TabKind,
     pub name: String,
-    pub method: HttpMethod,
-    pub url: String,
-    /// Raw `Name: Value` lines (one structured KV table replaces this in P3).
-    pub headers_text: String,
-    /// Set once the user edits the raw headers. Gates header write-back so a request's
-    /// disabled headers — which the raw-text view cannot represent — are not silently dropped
-    /// when the user only edits the url/body. The full KV table (P3) removes this limitation.
-    pub headers_edited: bool,
+    pub panel: EditorPanel,
+    /// Editable buffer for the numeric request timeout (the model stores `u64`).
+    pub timeout_text: String,
+    /// Primary body text buffer (raw body, or the GraphQL query).
     pub body: text_editor::Content,
+    /// GraphQL variables buffer.
+    pub gql_vars: text_editor::Content,
     pub dirty: bool,
     pub sending: bool,
     /// Generation of the in-flight send, used to drop stale results.
@@ -37,49 +39,81 @@ pub struct Tab {
 }
 
 impl Tab {
-    /// Build a tab from a node (HTTP or WebSocket). Folders are not openable; callers must guard.
+    /// Build a tab from a node, seeding the body buffers from its stored body.
     pub fn from_node(path: NodePath, node: &Node) -> Self {
-        let base = |kind, name: String, method, url, headers_text, body_text: String| Tab {
-            path: path.clone(),
+        let (kind, name, body, vars) = match node {
+            Node::Http(r) => (
+                TabKind::Http,
+                display_name(&r.name, &r.slug),
+                primary_body_text(&r.body),
+                gql_vars_text(&r.body),
+            ),
+            Node::Ws(w) => (
+                TabKind::Ws,
+                display_name(&w.name, &w.slug),
+                String::new(),
+                String::new(),
+            ),
+            Node::Folder(f) => (
+                TabKind::Http,
+                display_name(&f.name, &f.slug),
+                String::new(),
+                String::new(),
+            ),
+        };
+        let timeout_text = match node {
+            Node::Http(r) => r.settings.timeout_ms.to_string(),
+            _ => "30000".to_string(),
+        };
+        Self {
+            path,
             kind,
             name,
-            method,
-            url,
-            headers_text,
-            headers_edited: false,
-            body: text_editor::Content::with_text(&body_text),
+            panel: EditorPanel::Params,
+            timeout_text,
+            body: text_editor::Content::with_text(&body),
+            gql_vars: text_editor::Content::with_text(&vars),
             dirty: false,
             sending: false,
             send_gen: 0,
             response: None,
             error: None,
-        };
-        match node {
-            Node::Http(r) => base(
-                TabKind::Http,
-                display_name(&r.name, &r.slug),
-                HttpMethod::parse(&r.method).unwrap_or_default(),
-                r.url.clone(),
-                headers_to_text(&r.headers),
-                raw_body_text(&r.body),
-            ),
-            Node::Ws(w) => base(
-                TabKind::Ws,
-                display_name(&w.name, &w.slug),
-                HttpMethod::Get,
-                w.url.clone(),
-                headers_to_text(&w.headers),
-                String::new(),
-            ),
-            Node::Folder(f) => base(
-                TabKind::Http,
-                display_name(&f.name, &f.slug),
-                HttpMethod::Get,
-                String::new(),
-                String::new(),
-                String::new(),
-            ),
         }
+    }
+
+    /// Reseed the body buffers from `body` (after a body-mode switch).
+    pub fn reload_body(&mut self, body: &Body) {
+        self.body = text_editor::Content::with_text(&primary_body_text(body));
+        self.gql_vars = text_editor::Content::with_text(&gql_vars_text(body));
+    }
+}
+
+/// Write the body text buffers back into the node (called on body edits and before send/save).
+pub fn sync_body(tab: &Tab, node: &mut Node) {
+    if let Node::Http(r) = node {
+        match &mut r.body {
+            Body::Raw { text, .. } => *text = tab.body.text(),
+            Body::GraphQl { query, variables } => {
+                *query = tab.body.text();
+                *variables = tab.gql_vars.text();
+            }
+            _ => {}
+        }
+    }
+}
+
+fn primary_body_text(body: &Body) -> String {
+    match body {
+        Body::Raw { text, .. } => text.clone(),
+        Body::GraphQl { query, .. } => query.clone(),
+        _ => String::new(),
+    }
+}
+
+fn gql_vars_text(body: &Body) -> String {
+    match body {
+        Body::GraphQl { variables, .. } => variables.clone(),
+        _ => String::new(),
     }
 }
 
@@ -91,98 +125,66 @@ fn display_name(name: &str, slug: &str) -> String {
     }
 }
 
-fn raw_body_text(body: &Body) -> String {
-    match body {
-        Body::Raw { text, .. } => text.clone(),
-        _ => String::new(),
-    }
-}
-
-/// Write a tab's editor buffers back into its node. Returns an error if edited headers don't
-/// parse. Headers are only rewritten when the user actually edited them (see [`Tab::headers_edited`]),
-/// so requests with disabled headers keep them when only the url/body changed.
-pub fn apply_tab_to_node(tab: &Tab, node: &mut Node) -> Result<(), String> {
-    let kvs: Option<Vec<KvEntry>> = if tab.headers_edited {
-        Some(
-            parse_header_lines(&tab.headers_text)?
-                .into_iter()
-                .map(|(key, value)| KvEntry {
-                    key,
-                    value,
-                    enabled: true,
-                })
-                .collect(),
-        )
-    } else {
-        None
-    };
-
-    match node {
-        Node::Http(r) => {
-            r.method = tab.method.as_str().to_string();
-            r.url = tab.url.clone();
-            if let Some(kvs) = kvs {
-                r.headers = kvs;
-            }
-            let body_text = tab.body.text();
-            r.body = if body_text.trim().is_empty() {
-                Body::None
-            } else {
-                let language = match &r.body {
-                    Body::Raw { language, .. } => *language,
-                    _ => RawLang::default(),
-                };
-                Body::Raw {
-                    language,
-                    text: body_text,
-                }
-            };
-        }
-        Node::Ws(w) => {
-            w.url = tab.url.clone();
-            if let Some(kvs) = kvs {
-                w.headers = kvs;
+/// Apply a row op to a key/value list (params, headers, url-encoded fields).
+pub(crate) fn apply_kv_entry(list: &mut Vec<KvEntry>, op: KvOp) {
+    match op {
+        KvOp::Add => list.push(KvEntry {
+            key: String::new(),
+            value: String::new(),
+            enabled: true,
+        }),
+        KvOp::Remove(i) => {
+            if i < list.len() {
+                list.remove(i);
             }
         }
-        Node::Folder(_) => {}
+        KvOp::Key(i, s) => {
+            if let Some(e) = list.get_mut(i) {
+                e.key = s;
+            }
+        }
+        KvOp::Value(i, s) => {
+            if let Some(e) = list.get_mut(i) {
+                e.value = s;
+            }
+        }
+        KvOp::Toggle(i, b) => {
+            if let Some(e) = list.get_mut(i) {
+                e.enabled = b;
+            }
+        }
     }
-    Ok(())
 }
 
-/// Parse `Name: Value` lines. Blank lines and `#` comments are ignored.
-pub fn parse_header_lines(raw: &str) -> Result<Vec<(String, String)>, String> {
-    let mut out = Vec::new();
-    for (i, line) in raw.lines().enumerate() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
+/// Apply a row op to a form-data parts list.
+pub(crate) fn apply_kv_formpart(parts: &mut Vec<FormPart>, op: KvOp) {
+    match op {
+        KvOp::Add => parts.push(FormPart {
+            key: String::new(),
+            kind: FormKind::Text,
+            value: String::new(),
+            src: String::new(),
+            enabled: true,
+        }),
+        KvOp::Remove(i) => {
+            if i < parts.len() {
+                parts.remove(i);
+            }
         }
-        let Some((name, value)) = line.split_once(':') else {
-            return Err(format!(
-                "Invalid header on line {} (expected `Name: Value`): {line}",
-                i + 1
-            ));
-        };
-        let name = name.trim();
-        if name.is_empty() {
-            return Err(format!("Empty header name on line {}", i + 1));
+        KvOp::Key(i, s) => {
+            if let Some(p) = parts.get_mut(i) {
+                p.key = s;
+            }
         }
-        out.push((name.to_string(), value.trim().to_string()));
+        KvOp::Value(i, s) => {
+            if let Some(p) = parts.get_mut(i) {
+                p.value = s;
+            }
+        }
+        KvOp::Toggle(i, b) => {
+            if let Some(p) = parts.get_mut(i) {
+                p.enabled = b;
+            }
+        }
     }
-    Ok(out)
-}
-
-/// Format enabled headers as `Name: Value` lines for the raw editor.
-pub fn headers_to_text(headers: &[KvEntry]) -> String {
-    let mut s = String::new();
-    for h in headers {
-        if !h.enabled || h.key.trim().is_empty() {
-            continue;
-        }
-        s.push_str(h.key.trim());
-        s.push_str(": ");
-        s.push_str(h.value.trim());
-        s.push('\n');
-    }
-    s
 }

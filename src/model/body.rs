@@ -25,6 +25,36 @@ pub enum RawLang {
     Javascript,
 }
 
+impl RawLang {
+    /// All variants, for rendering a picker.
+    pub const fn all() -> &'static [RawLang] {
+        &[
+            RawLang::Json,
+            RawLang::Text,
+            RawLang::Xml,
+            RawLang::Html,
+            RawLang::Javascript,
+        ]
+    }
+
+    /// Human-facing label.
+    pub const fn label(self) -> &'static str {
+        match self {
+            RawLang::Json => "JSON",
+            RawLang::Text => "Text",
+            RawLang::Xml => "XML",
+            RawLang::Html => "HTML",
+            RawLang::Javascript => "JavaScript",
+        }
+    }
+}
+
+impl std::fmt::Display for RawLang {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
 /// A `multipart/form-data` part: either an inline text value or a file reference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

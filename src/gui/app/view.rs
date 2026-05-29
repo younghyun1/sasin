@@ -8,6 +8,7 @@ use crate::gui::app::App;
 use crate::gui::components::{ResponseView, Split, SplitAxis, editor, tabs, tree};
 use crate::gui::messages::SplitId;
 use crate::gui::theme;
+use crate::model::{Node, find_node};
 
 impl App {
     pub fn view(&self) -> Element<'_, Message> {
@@ -30,7 +31,20 @@ impl App {
         let active_tab = self.active.and_then(|i| self.tabs.get(i));
 
         let editor_area: Element<'_, Message> = match active_tab {
-            Some(tab) => column![tab_bar, editor::view(tab)].spacing(6).into(),
+            Some(tab) => {
+                let panel: Element<'_, Message> = match find_node(&self.workspace.root, &tab.path) {
+                    Some(Node::Http(req)) => editor::view(req, tab),
+                    Some(Node::Ws(_)) => container(
+                        text("WebSocket sessions are interactive — console arrives in P7.")
+                            .size(14),
+                    )
+                    .padding(20)
+                    .center_x(Length::Fill)
+                    .into(),
+                    _ => container(text("Not editable.").size(14)).padding(20).into(),
+                };
+                column![tab_bar, panel].spacing(6).into()
+            }
             None => column![
                 tab_bar,
                 container(text("Open a request from the tree, or create one.").size(16))

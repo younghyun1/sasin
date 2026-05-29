@@ -39,14 +39,9 @@ impl App {
         };
         let path = self.tabs[i].path.clone();
 
-        // Flush editor buffers into the node so the send reflects current edits.
-        if let Some(node) = find_node_mut(&mut self.workspace.root, &path)
-            && let Err(e) = state::apply_tab_to_node(&self.tabs[i], node)
-        {
-            let tab = &mut self.tabs[i];
-            tab.error = Some(e);
-            tab.response = None;
-            return Task::none();
+        // Body text is the only buffered field; flush it into the node before sending.
+        if let Some(node) = find_node_mut(&mut self.workspace.root, &path) {
+            state::sync_body(&self.tabs[i], node);
         }
 
         // Only HTTP requests are sent here (websocket sessions are interactive — P7).

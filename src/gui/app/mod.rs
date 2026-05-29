@@ -6,6 +6,7 @@
 
 mod boot;
 mod commands;
+mod edit;
 mod view;
 
 use std::collections::HashSet;
@@ -15,9 +16,9 @@ use iced::Task;
 
 use crate::gui::Message;
 use crate::gui::messages::SplitId;
-use crate::gui::state::{self, Tab};
+use crate::gui::state::Tab;
 use crate::http::HttpClientConfig;
-use crate::model::{HttpRequest, Node, NodePath, Workspace, find_node, find_node_mut, remove_node};
+use crate::model::{HttpRequest, Node, NodePath, Workspace, find_node, remove_node};
 use crate::persist::{app_state_dir, default_dataset_path};
 use crate::storage::delete_node;
 use crate::storage::layout::unique_slug;
@@ -135,22 +136,7 @@ impl App {
                 if i >= self.tabs.len() {
                     return Task::none();
                 }
-                let mut task = Task::none();
-                if self.tabs[i].dirty {
-                    let name = self.tabs[i].name.clone();
-                    let path = self.tabs[i].path.clone();
-                    let applied = match find_node_mut(&mut self.workspace.root, &path) {
-                        Some(node) => state::apply_tab_to_node(&self.tabs[i], node),
-                        None => Ok(()),
-                    };
-                    match applied {
-                        Ok(()) => task = self.save_task(),
-                        Err(e) => {
-                            self.status =
-                                Some(format!("Closed \"{name}\" with unsaved changes: {e}"))
-                        }
-                    }
-                }
+                let dirty = self.tabs[i].dirty;
                 self.tabs.remove(i);
                 // Preserve the selected tab's identity across the index shift.
                 self.active = if self.tabs.is_empty() {
@@ -164,56 +150,85 @@ impl App {
                 } else {
                     None
                 };
-                task
+                if dirty {
+                    self.save_task()
+                } else {
+                    Task::none()
+                }
             }
             Message::MethodChanged(method) => {
-                if let Some(tab) = self.active_tab_mut() {
-                    tab.method = method;
-                    tab.dirty = true;
-                }
+                self.set_method(method);
                 Task::none()
             }
             Message::UrlChanged(url) => {
-                if let Some(tab) = self.active_tab_mut() {
-                    tab.url = url;
-                    tab.dirty = true;
-                }
+                self.set_url(url);
                 Task::none()
             }
-            Message::HeadersChanged(s) => {
-                if let Some(tab) = self.active_tab_mut() {
-                    tab.headers_text = s;
-                    tab.headers_edited = true;
-                    tab.dirty = true;
-                }
+            Message::SelectPanel(panel) => {
+                self.select_panel(panel);
+                Task::none()
+            }
+            Message::Kv(target, op) => {
+                self.apply_kv(target, op);
+                Task::none()
+            }
+            Message::AuthChanged(choice) => {
+                self.set_auth_choice(choice);
+                Task::none()
+            }
+            Message::AuthField(kind, value) => {
+                self.set_auth_field(kind, value);
+                Task::none()
+            }
+            Message::AuthApiKeyInHeader(in_header) => {
+                self.set_apikey_in_header(in_header);
+                Task::none()
+            }
+            Message::BodyModeChanged(choice) => {
+                self.set_body_mode(choice);
+                Task::none()
+            }
+            Message::RawLangChanged(lang) => {
+                self.set_raw_lang(lang);
                 Task::none()
             }
             Message::BodyAction(action) => {
-                if let Some(tab) = self.active_tab_mut() {
-                    let edited = action.is_edit();
-                    tab.body.perform(action);
-                    if edited {
-                        tab.dirty = true;
-                    }
-                }
+                self.body_action(action, false);
+                Task::none()
+            }
+            Message::GqlVarsAction(action) => {
+                self.body_action(action, true);
+                Task::none()
+            }
+            Message::FormPartFile(index, is_file) => {
+                self.set_form_kind(index, is_file);
+                Task::none()
+            }
+            Message::FormPartSrc(index, src) => {
+                self.set_form_src(index, src);
+                Task::none()
+            }
+            Message::BinaryFileChanged(file) => {
+                self.set_binary_file(file);
+                Task::none()
+            }
+            Message::SettingTimeout(text) => {
+                self.set_timeout(text);
+                Task::none()
+            }
+            Message::SettingFlagChanged(flag, value) => {
+                self.set_flag(flag, value);
+                Task::none()
+            }
+            Message::SettingProxy(proxy) => {
+                self.set_proxy(proxy);
                 Task::none()
             }
             Message::SaveActiveTab => {
-                let Some(i) = self.active else {
-                    return Task::none();
-                };
-                let path = self.tabs[i].path.clone();
-                if let Some(node) = find_node_mut(&mut self.workspace.root, &path) {
-                    match state::apply_tab_to_node(&self.tabs[i], node) {
-                        Ok(()) => {
-                            self.tabs[i].dirty = false;
-                            self.tabs[i].error = None;
-                        }
-                        Err(e) => {
-                            self.tabs[i].error = Some(e);
-                            return Task::none();
-                        }
-                    }
+                // Structured fields and body text are already live on the node; just persist.
+                if let Some(i) = self.active {
+                    self.tabs[i].dirty = false;
+                    self.tabs[i].error = None;
                 }
                 self.save_task()
             }
