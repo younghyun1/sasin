@@ -8,17 +8,25 @@ use reqwest::header::CONTENT_TYPE;
 
 use crate::model::{Body, FormKind, RawLang};
 
-/// Apply `body` to `rb`. Reads referenced files relative to `base_dir`.
-pub fn apply_body(
+/// Apply `body` to `rb`. Reads referenced files relative to `base_dir`. `user_content_type` is
+/// true when the request already carries an explicit `Content-Type` header, in which case the raw
+/// body does not add its own (avoids a duplicate header).
+pub async fn apply_body(
     rb: RequestBuilder,
     body: &Body,
     base_dir: &Path,
+    user_content_type: bool,
 ) -> Result<RequestBuilder, String> {
     match body {
         Body::None => Ok(rb),
-        Body::Raw { language, text } => Ok(rb
-            .header(CONTENT_TYPE, raw_content_type(*language))
-            .body(text.clone())),
+        Body::Raw { language, text } => {
+            let rb = if user_content_type {
+                rb
+            } else {
+                rb.header(CONTENT_TYPE, raw_content_type(*language))
+            };
+            Ok(rb.body(text.clone()))
+        }
         Body::UrlEncoded { fields } => {
             let pairs: Vec<(String, String)> = fields
                 .iter()
@@ -39,7 +47,8 @@ pub fn apply_body(
                     }
                     FormKind::File => {
                         let path = base_dir.join(&part.src);
-                        let data = std::fs::read(&path)
+                        let data = tokio::fs::read(&path)
+                            .await
                             .map_err(|e| format!("form-data file `{}`: {e}", path.display()))?;
                         let file_name = path
                             .file_name()
@@ -55,7 +64,8 @@ pub fn apply_body(
         }
         Body::Binary { file } => {
             let path = base_dir.join(file);
-            let data = std::fs::read(&path)
+            let data = tokio::fs::read(&path)
+                .await
                 .map_err(|e| format!("binary body file `{}`: {e}", path.display()))?;
             Ok(rb.body(data))
         }

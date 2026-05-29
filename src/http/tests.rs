@@ -94,8 +94,8 @@ fn auth_sets_expected_headers() -> Result<(), String> {
     Ok(())
 }
 
-#[test]
-fn raw_body_sets_content_type_and_bytes() -> Result<(), String> {
+#[tokio::test]
+async fn raw_body_sets_content_type_and_bytes() -> Result<(), String> {
     let client = reqwest::Client::new();
     let rb = client.request(Method::POST, "http://example.test/");
     let req = apply_body(
@@ -105,7 +105,9 @@ fn raw_body_sets_content_type_and_bytes() -> Result<(), String> {
             text: "{\"a\":1}".into(),
         },
         Path::new("/tmp"),
+        false,
     )
+    .await
     .and_then(|rb| rb.build().map_err(|e| e.to_string()))?;
     assert_eq!(
         header(&req, CONTENT_TYPE).as_deref(),
@@ -118,8 +120,8 @@ fn raw_body_sets_content_type_and_bytes() -> Result<(), String> {
     Ok(())
 }
 
-#[test]
-fn graphql_body_is_json_envelope() -> Result<(), String> {
+#[tokio::test]
+async fn graphql_body_is_json_envelope() -> Result<(), String> {
     let client = reqwest::Client::new();
     let rb = client.request(Method::POST, "http://example.test/");
     let req = apply_body(
@@ -129,7 +131,9 @@ fn graphql_body_is_json_envelope() -> Result<(), String> {
             variables: "{\"x\":1}".into(),
         },
         Path::new("/tmp"),
+        false,
     )
+    .await
     .and_then(|rb| rb.build().map_err(|e| e.to_string()))?;
     assert_eq!(
         header(&req, CONTENT_TYPE).as_deref(),

@@ -27,7 +27,11 @@ pub async fn execute(
     let mut rb = client.request(method, url);
     rb = apply_headers(rb, &request.headers)?;
     rb = apply_auth(rb, auth);
-    rb = apply_body(rb, &request.body, base_dir)?;
+    let user_content_type = request
+        .headers
+        .iter()
+        .any(|h| h.enabled && h.key.trim().eq_ignore_ascii_case("content-type"));
+    rb = apply_body(rb, &request.body, base_dir, user_content_type).await?;
 
     let start = Instant::now();
     let res = rb.send().await.map_err(|e| e.to_string())?;
