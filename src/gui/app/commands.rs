@@ -1,12 +1,16 @@
 //! Async commands: persisting the workspace and sending the active request.
 
+use std::collections::HashSet;
+
 use iced::Task;
 
 use crate::gui::Message;
 use crate::gui::app::App;
-use crate::gui::state;
+use crate::gui::state::{self, Tab};
+use crate::interop;
 use crate::model::{Node, find_node, find_node_mut, resolve_auth};
 use crate::runtime;
+use crate::storage::layout::unique_slug;
 use crate::storage::save_workspace;
 
 impl App {
@@ -27,6 +31,53 @@ impl App {
             },
             Message::Saved,
         )
+    }
+
+    /// Parse the curl-import buffer into a new request at the workspace root and open it.
+    pub(super) fn import_curl(&mut self) -> Task<Message> {
+        let text = std::mem::take(&mut self.curl_import_text);
+        if text.trim().is_empty() {
+            return Task::none();
+        }
+        match interop::from_curl(&text) {
+            Ok(mut req) => {
+                let mut taken: HashSet<String> = self
+                    .workspace
+                    .root
+                    .iter()
+                    .map(|n| n.slug().to_string())
+                    .collect();
+                let slug = unique_slug("imported", &mut taken);
+                req.slug = slug.clone();
+                self.workspace.root.push(Node::Http(req));
+                let path = vec![slug];
+                if let Some(node) = find_node(&self.workspace.root, &path) {
+                    self.tabs.push(Tab::from_node(path, node));
+                    self.active = Some(self.tabs.len() - 1);
+                }
+                self.save_task()
+            }
+            Err(e) => {
+                self.status = Some(format!("curl import failed: {e}"));
+                Task::none()
+            }
+        }
+    }
+
+    /// Copy the active request to the clipboard as a curl command.
+    pub(super) fn copy_as_curl(&mut self) -> Task<Message> {
+        let Some(i) = self.active else {
+            return Task::none();
+        };
+        let path = self.tabs[i].path.clone();
+        match find_node(&self.workspace.root, &path) {
+            Some(Node::Http(r)) => {
+                let curl = interop::to_curl(r);
+                self.status = Some("Copied request as curl.".to_string());
+                iced::clipboard::write(curl)
+            }
+            _ => Task::none(),
+        }
     }
 
     /// Send the active tab's request via the exec layer.
@@ -55,7 +106,9 @@ impl App {
         };
         // Resolve auth inheritance, then interpolate variables (active env overlaid on globals).
         request.auth = resolve_auth(&self.workspace.root, &path);
-        let env = self.active_env.and_then(|idx| self.workspace.environments.get(idx));
+        let env = self
+            .active_env
+            .and_then(|idx| self.workspace.environments.get(idx));
         let ctx = runtime::VarContext::from_scopes(&self.workspace.globals, env);
         let request = runtime::resolve_request(&request, &ctx);
         let base_dir = self.workspace_dir.clone();

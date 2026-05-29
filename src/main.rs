@@ -10,6 +10,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 pub mod build_info;
 pub mod gui;
 pub mod http;
+pub mod interop;
 pub mod model;
 pub mod models;
 pub mod persist;

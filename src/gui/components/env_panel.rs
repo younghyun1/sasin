@@ -12,11 +12,21 @@ use crate::model::{Environment, Variable};
 pub fn view(envs: &[Environment], active: Option<usize>) -> Element<'_, Message> {
     let mut selector: Vec<Element<'_, Message>> = Vec::new();
     for (i, env) in envs.iter().enumerate() {
-        let label = if env.name.is_empty() { &env.slug } else { &env.name };
-        let btn = button(text(label.clone()).size(12)).padding(6).on_press(Message::SelectEnv(i));
+        let label = if env.name.is_empty() {
+            &env.slug
+        } else {
+            &env.name
+        };
+        let btn = button(text(label.clone()).size(12))
+            .padding(6)
+            .on_press(Message::SelectEnv(i));
         selector.push(
-            if active == Some(i) { btn.style(theme::selected) } else { btn.style(theme::flat) }
-                .into(),
+            if active == Some(i) {
+                btn.style(theme::selected)
+            } else {
+                btn.style(theme::flat)
+            }
+            .into(),
         );
     }
     selector.push(

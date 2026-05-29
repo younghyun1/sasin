@@ -23,8 +23,12 @@ impl App {
     }
 
     pub(super) fn new_env(&mut self) {
-        let mut taken: HashSet<String> =
-            self.workspace.environments.iter().map(|e| e.slug.clone()).collect();
+        let mut taken: HashSet<String> = self
+            .workspace
+            .environments
+            .iter()
+            .map(|e| e.slug.clone())
+            .collect();
         let slug = unique_slug("env", &mut taken);
         self.workspace.environments.push(Environment {
             slug: slug.clone(),

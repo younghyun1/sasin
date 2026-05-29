@@ -1,6 +1,6 @@
 //! Rendering for [`App`]: sidebar tree, tab bar + editor, response, in two resizable splits.
 
-use iced::widget::{Space, button, column, container, text};
+use iced::widget::{Space, button, column, container, row, text, text_input};
 use iced::{Element, Length};
 
 use crate::gui::Message;
@@ -20,6 +20,17 @@ impl App {
                     .padding(8)
                     .on_press(Message::NewRequest),
                 env_panel::view(&self.workspace.environments, self.active_env),
+                row![
+                    text_input("paste curl…", &self.curl_import_text)
+                        .on_input(Message::CurlImportChanged)
+                        .padding(6)
+                        .size(12)
+                        .width(Length::Fill),
+                    button(text("Import").size(12))
+                        .padding(6)
+                        .on_press(Message::CurlImport),
+                ]
+                .spacing(6),
             ]
             .spacing(10)
             .padding(10),

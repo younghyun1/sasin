@@ -99,6 +99,11 @@ pub enum Message {
     NewEnv,
     EnvVar(KvOp),
 
+    // --- curl interop ---
+    CurlImportChanged(String),
+    CurlImport,
+    CopyAsCurl,
+
     // --- Tabs ---
     SelectTab(usize),
     CloseTab(usize),

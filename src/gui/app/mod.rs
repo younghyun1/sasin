@@ -34,6 +34,8 @@ pub struct App {
     active: Option<usize>,
     /// Index into `workspace.environments`; `None` means no active environment.
     active_env: Option<usize>,
+    /// Buffer for the "import from curl" box.
+    curl_import_text: String,
     http_config: HttpClientConfig,
     send_gen: u64,
     active_abort: Option<tokio::task::AbortHandle>,
@@ -62,6 +64,7 @@ impl App {
             tabs: Vec::new(),
             active: None,
             active_env,
+            curl_import_text: String::new(),
             http_config: HttpClientConfig::default(),
             send_gen: 0,
             active_abort: None,
@@ -146,6 +149,12 @@ impl App {
                 self.apply_env_var(op);
                 self.save_task()
             }
+            Message::CurlImportChanged(text) => {
+                self.curl_import_text = text;
+                Task::none()
+            }
+            Message::CurlImport => self.import_curl(),
+            Message::CopyAsCurl => self.copy_as_curl(),
             Message::SelectTab(i) => {
                 if i < self.tabs.len() {
                     self.active = Some(i);

@@ -37,6 +37,9 @@ pub fn view<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
     let actions = row![
         text(&tab.name).size(14),
         Space::new().width(Length::Fill),
+        button(text("Copy curl").size(13))
+            .padding(8)
+            .on_press(Message::CopyAsCurl),
         button(text("Save").size(13))
             .padding(8)
             .on_press(Message::SaveActiveTab),
