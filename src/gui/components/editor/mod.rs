@@ -19,6 +19,7 @@ pub fn view<'a>(
     req: &'a HttpRequest,
     tab: &'a Tab,
     hl: iced::highlighter::Theme,
+    snippet_lang: crate::interop::SnippetLang,
 ) -> Element<'a, Message> {
     let method = pick_list(
         HttpMethod::all(),
@@ -43,10 +44,17 @@ pub fn view<'a>(
     let actions = row![
         text(&tab.name).size(14).font(theme::fonts::UI_SEMIBOLD),
         Space::new().width(Length::Fill),
-        button(text("Copy curl").size(13))
+        pick_list(
+            crate::interop::SnippetLang::all(),
+            Some(snippet_lang),
+            Message::SnippetLangChanged
+        )
+        .padding(6)
+        .text_size(12),
+        button(text("Copy").size(13))
             .padding(8)
             .style(theme::flat)
-            .on_press(Message::CopyAsCurl),
+            .on_press(Message::CopySnippet),
         button(text("Save").size(13))
             .padding(8)
             .style(theme::flat)
@@ -91,6 +99,7 @@ fn panel_bar(active: EditorPanel) -> Element<'static, Message> {
         make("Auth", EditorPanel::Auth),
         make("Body", EditorPanel::Body),
         make("Scripts", EditorPanel::Scripts),
+        make("Docs", EditorPanel::Docs),
         make("Settings", EditorPanel::Settings),
     ]
     .spacing(2)

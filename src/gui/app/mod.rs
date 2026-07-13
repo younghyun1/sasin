@@ -78,6 +78,8 @@ pub struct App {
     history_shown: usize,
     /// Cookie-manager add-row buffers.
     cookie_draft: CookieDraft,
+    /// Selected code-snippet language for the editor's Copy action.
+    snippet_lang: crate::interop::SnippetLang,
 }
 
 impl App {
@@ -127,6 +129,7 @@ impl App {
             history_filter: String::new(),
             history_shown: HISTORY_SHOWN_DEFAULT,
             cookie_draft: CookieDraft::default(),
+            snippet_lang: crate::interop::SnippetLang::default(),
         };
         (app, Task::none())
     }

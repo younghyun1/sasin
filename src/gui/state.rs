@@ -44,6 +44,8 @@ pub struct Tab {
     pub pre_script: text_editor::Content,
     /// Test script buffer.
     pub test_script: text_editor::Content,
+    /// Request documentation buffer (the node's `description`).
+    pub docs: text_editor::Content,
     /// Last script run's test results, console output, and error (ephemeral, per send).
     pub script_tests: Vec<TestResult>,
     pub script_console: Vec<String>,
@@ -87,6 +89,10 @@ impl Tab {
             Node::Http(r) => (r.scripts.pre_request.clone(), r.scripts.test.clone()),
             _ => (String::new(), String::new()),
         };
+        let docs = match node {
+            Node::Http(r) => r.description.clone().unwrap_or_default(),
+            _ => String::new(),
+        };
         Self {
             path,
             kind,
@@ -97,6 +103,7 @@ impl Tab {
             gql_vars: text_editor::Content::with_text(&vars),
             pre_script: text_editor::Content::with_text(&pre),
             test_script: text_editor::Content::with_text(&test),
+            docs: text_editor::Content::with_text(&docs),
             script_tests: Vec::new(),
             script_console: Vec::new(),
             script_error: None,
@@ -190,6 +197,18 @@ pub fn sync_scripts(tab: &Tab, node: &mut Node) {
     if let Node::Http(r) = node {
         r.scripts.pre_request = tab.pre_script.text();
         r.scripts.test = tab.test_script.text();
+    }
+}
+
+/// Write the docs buffer back into the node's description (empty text clears it).
+pub fn sync_docs(tab: &Tab, node: &mut Node) {
+    if let Node::Http(r) = node {
+        let text = tab.docs.text();
+        r.description = if text.trim().is_empty() {
+            None
+        } else {
+            Some(text)
+        };
     }
 }
 

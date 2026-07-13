@@ -38,8 +38,22 @@ pub fn view<'a>(req: &'a HttpRequest, tab: &'a Tab, hl: HlTheme) -> Element<'a, 
         EditorPanel::Auth => auth_panel(&req.auth),
         EditorPanel::Body => body_panel(req, tab, hl),
         EditorPanel::Scripts => scripts_panel(tab, hl),
+        EditorPanel::Docs => docs_panel(tab),
         EditorPanel::Settings => settings_panel(req, tab),
     }
+}
+
+fn docs_panel(tab: &Tab) -> Element<'_, Message> {
+    column![
+        text("Request documentation").size(13),
+        text_editor(&tab.docs)
+            .placeholder("Describe this request: purpose, expected responses, notes…")
+            .on_action(Message::DocsAction)
+            .height(Length::Fixed(280.0)),
+    ]
+    .spacing(6)
+    .width(Length::Fill)
+    .into()
 }
 
 fn scripts_panel(tab: &Tab, hl: HlTheme) -> Element<'_, Message> {

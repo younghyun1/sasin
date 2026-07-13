@@ -38,6 +38,7 @@ pub enum EditorPanel {
     Auth,
     Body,
     Scripts,
+    Docs,
     Settings,
 }
 
@@ -124,10 +125,11 @@ pub enum Message {
     NewEnv,
     EnvVar(KvOp),
 
-    // --- curl / Postman interop ---
+    // --- curl / Postman interop, code snippets ---
     CurlImportChanged(String),
     CurlImport,
-    CopyAsCurl,
+    SnippetLangChanged(crate::interop::SnippetLang),
+    CopySnippet,
     ImportPostmanPressed,
     PostmanImported(Result<Box<crate::interop::PostmanImport>, String>),
 
@@ -175,6 +177,7 @@ pub enum Message {
     GqlVarsAction(text_editor::Action),
     PreScriptAction(text_editor::Action),
     TestScriptAction(text_editor::Action),
+    DocsAction(text_editor::Action),
     FormPartFile(usize, bool),
     FormPartSrc(usize, String),
     BinaryFileChanged(String),

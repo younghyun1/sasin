@@ -140,17 +140,17 @@ impl App {
         self.save_task()
     }
 
-    /// Copy the active request to the clipboard as a curl command.
-    pub(super) fn copy_as_curl(&mut self) -> Task<Message> {
+    /// Copy the active request to the clipboard as a code snippet in the selected language.
+    pub(super) fn copy_snippet(&mut self) -> Task<Message> {
         let Some(i) = self.active else {
             return Task::none();
         };
         let path = self.tabs[i].path.clone();
         match find_node(&self.workspace.root, &path) {
             Some(Node::Http(r)) => {
-                let curl = interop::to_curl(r);
-                self.status = Some("Copied request as curl.".to_string());
-                iced::clipboard::write(curl)
+                let snippet = interop::to_snippet(r, self.snippet_lang);
+                self.status = Some(format!("Copied request as {}.", self.snippet_lang));
+                iced::clipboard::write(snippet)
             }
             _ => Task::none(),
         }

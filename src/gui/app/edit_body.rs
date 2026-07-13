@@ -136,6 +136,23 @@ impl App {
         }
     }
 
+    /// Perform a docs-editor action on the description buffer, then sync it to the node.
+    pub(super) fn docs_action(&mut self, action: text_editor::Action) {
+        let Some(i) = self.active else {
+            return;
+        };
+        let edited = action.is_edit();
+        self.tabs[i].docs.perform(action);
+        if !edited {
+            return;
+        }
+        self.tabs[i].dirty = true;
+        let path = self.tabs[i].path.clone();
+        if let Some(node) = find_node_mut(&mut self.workspace.root, &path) {
+            state::sync_docs(&self.tabs[i], node);
+        }
+    }
+
     /// Perform a body-editor action on the right buffer, then sync it into the node.
     pub(super) fn body_action(&mut self, action: text_editor::Action, gql_vars: bool) {
         let Some(i) = self.active else {

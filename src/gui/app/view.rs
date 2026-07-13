@@ -87,9 +87,12 @@ impl App {
         let editor_area: Element<'_, Message> = match active_tab {
             Some(tab) => {
                 let panel: Element<'_, Message> = match find_node(&self.workspace.root, &tab.path) {
-                    Some(Node::Http(req)) => {
-                        editor::view(req, tab, theme::code_theme(self.prefs.theme))
-                    }
+                    Some(Node::Http(req)) => editor::view(
+                        req,
+                        tab,
+                        theme::code_theme(self.prefs.theme),
+                        self.snippet_lang,
+                    ),
                     Some(Node::Ws(req)) => {
                         let rt = self.ws.iter().find(|r| r.path == tab.path);
                         ws_console::view(req, rt)

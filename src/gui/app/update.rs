@@ -48,7 +48,11 @@ impl App {
                 Task::none()
             }
             Message::CurlImport => self.import_curl(),
-            Message::CopyAsCurl => self.copy_as_curl(),
+            Message::SnippetLangChanged(lang) => {
+                self.snippet_lang = lang;
+                Task::none()
+            }
+            Message::CopySnippet => self.copy_snippet(),
             Message::ImportPostmanPressed => self.import_postman(),
             Message::PostmanImported(result) => self.postman_imported(result),
             Message::Ws(path, event) => {
@@ -170,6 +174,10 @@ impl App {
             }
             Message::TestScriptAction(action) => {
                 self.script_action(action, true);
+                Task::none()
+            }
+            Message::DocsAction(action) => {
+                self.docs_action(action);
                 Task::none()
             }
             Message::FormPartFile(index, is_file) => {
