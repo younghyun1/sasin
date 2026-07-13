@@ -123,7 +123,7 @@ impl App {
 
         // The runner / cookie-manager views take over the main area when open.
         let main: Element<'_, Message> = if self.show_cookies {
-            cookie_manager::view(&self.http_config.jar.snapshot())
+            cookie_manager::view(&self.http_config.jar.snapshot(), &self.cookie_draft)
         } else if let Some(runner) = &self.runner {
             runner_panel::view(runner)
         } else {

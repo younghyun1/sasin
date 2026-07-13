@@ -40,15 +40,31 @@ impl App {
     }
 
     /// Close was requested (interception enabled via `exit_on_close_request(false)`):
-    /// capture maximized state, flush the config, then actually close.
+    /// capture maximized state, flush config + cookie jar, then actually close.
     pub(super) fn close_requested(&mut self, id: window::Id) -> Task<Message> {
         self.sync_prefs();
         let prefs = self.prefs;
+        let cookies = self.http_config.jar.to_json().ok();
+        let dir = self.workspace_dir.clone();
         window::is_maximized(id).then(move |maximized| {
             let mut prefs = prefs;
             prefs.window.maximized = maximized;
-            Task::future(async move { save_prefs_blocking(prefs).await })
-                .then(move |()| window::close(id))
+            let cookies = cookies.clone();
+            let dir = dir.clone();
+            Task::future(async move {
+                let flush = tokio::task::spawn_blocking(move || {
+                    save_prefs(&prefs);
+                    if let Some(json) = cookies
+                        && let Err(e) = crate::storage::write_cookies(&dir, &json)
+                    {
+                        warn!(error = %e, "Cookie flush on close failed");
+                    }
+                });
+                if let Err(e) = flush.await {
+                    warn!(error = %e, "Close-flush task panicked");
+                }
+            })
+            .then(move |()| window::close(id))
         })
     }
 }

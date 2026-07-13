@@ -68,8 +68,9 @@ tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
 # data-driven collection runner: CSV data files (JSON handled via serde_json)
 csv = "1.4"
 
-# shared, enumerable cookie jar (same version reqwest 0.13 uses internally)
-cookie_store = "0.22"
+# shared, enumerable cookie jar (same version reqwest 0.13 uses internally);
+# serde_json enables persistence to the per-workspace cache dir
+cookie_store = { version = "0.22", features = ["serde_json"] }
 
 # filesystem watch to reload the workspace on external changes (git pull / branch switch)
 notify = "8"

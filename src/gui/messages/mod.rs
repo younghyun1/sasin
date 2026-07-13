@@ -85,6 +85,15 @@ pub enum MoveDir {
     Down,
 }
 
+/// Which field of the cookie-manager add row changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CookieDraftField {
+    Domain,
+    Path,
+    Name,
+    Value,
+}
+
 /// Tree structure operations (rename / duplicate / create / reorder), grouped so the
 /// central dispatch stays a single thin arm.
 #[derive(Debug, Clone)]
@@ -206,6 +215,13 @@ pub enum Message {
     // --- Cookie manager ---
     ToggleCookieManager,
     ClearCookies,
+    CookieDelete {
+        domain: String,
+        path: String,
+        name: String,
+    },
+    CookieDraftChanged(CookieDraftField, String),
+    CookieAdd,
 
     // --- Filesystem watch ---
     /// The workspace directory changed on disk (e.g. git pull); reload if it differs.

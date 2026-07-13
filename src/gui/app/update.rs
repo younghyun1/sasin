@@ -234,7 +234,8 @@ impl App {
                     self.run_test_script(pos);
                 }
                 self.active_abort = None;
-                Task::none()
+                // The response may have set cookies; keep the persisted jar current.
+                self.persist_cookies()
             }
             Message::RequestFailed(send_id, err) => {
                 if let Some(tab) = self
@@ -294,7 +295,41 @@ impl App {
             Message::ClearCookies => {
                 self.http_config.jar.clear();
                 self.status = Some("Cookies cleared.".to_string());
+                self.persist_cookies()
+            }
+            Message::CookieDelete { domain, path, name } => {
+                if self.http_config.jar.remove(&domain, &path, &name) {
+                    self.status = Some(format!("Deleted cookie {name}."));
+                }
+                self.persist_cookies()
+            }
+            Message::CookieDraftChanged(field, value) => {
+                use crate::gui::messages::CookieDraftField;
+                match field {
+                    CookieDraftField::Domain => self.cookie_draft.domain = value,
+                    CookieDraftField::Path => self.cookie_draft.path = value,
+                    CookieDraftField::Name => self.cookie_draft.name = value,
+                    CookieDraftField::Value => self.cookie_draft.value = value,
+                }
                 Task::none()
+            }
+            Message::CookieAdd => {
+                let d = &self.cookie_draft;
+                match self
+                    .http_config
+                    .jar
+                    .add(&d.domain, &d.path, &d.name, &d.value)
+                {
+                    Ok(()) => {
+                        self.cookie_draft = Default::default();
+                        self.status = Some("Cookie added.".to_string());
+                        self.persist_cookies()
+                    }
+                    Err(e) => {
+                        self.status = Some(format!("Cookie add failed: {e}"));
+                        Task::none()
+                    }
+                }
             }
             Message::WorkspaceChanged => {
                 self.reload_workspace();

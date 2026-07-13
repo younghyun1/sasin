@@ -370,6 +370,34 @@ impl App {
         }
     }
 
+    /// Persist the cookie jar off-thread (errors surface to the status line).
+    pub(super) fn persist_cookies(&self) -> Task<Message> {
+        let json = match self.http_config.jar.to_json() {
+            Ok(json) => json,
+            Err(e) => {
+                return notice(&format!("Cookie save failed: {e}"));
+            }
+        };
+        let dir = self.workspace_dir.clone();
+        Task::perform(
+            async move {
+                match tokio::task::spawn_blocking(move || {
+                    crate::storage::write_cookies(&dir, &json)
+                })
+                .await
+                {
+                    Ok(Ok(())) => None,
+                    Ok(Err(e)) => Some(e.to_string()),
+                    Err(e) => Some(e.to_string()),
+                }
+            },
+            |err| match err {
+                Some(e) => Message::Notice(format!("Cookie save failed: {e}")),
+                None => Message::Ignore,
+            },
+        )
+    }
+
     /// Persist the history cache off-thread (errors surface to the status line).
     pub(super) fn persist_history(&self) -> Task<Message> {
         let dir = self.workspace_dir.clone();

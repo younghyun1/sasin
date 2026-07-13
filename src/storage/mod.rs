@@ -15,7 +15,8 @@ mod tests;
 
 pub use cache::{
     HistoryCache, HistoryRecord, IndexCache, IndexEntry, KIND_FOLDER, KIND_HTTP, KIND_WS,
-    build_index, ensure_gitignore, read_history, read_index, write_history, write_index,
+    build_index, ensure_gitignore, read_cookies, read_history, read_index, write_cookies,
+    write_history, write_index,
 };
 pub use error::{StorageError, StorageResult};
 pub use load::load_workspace;

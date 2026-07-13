@@ -18,6 +18,15 @@ pub enum TabKind {
     Ws,
 }
 
+/// Edit buffers for the cookie manager's add row.
+#[derive(Debug, Clone, Default)]
+pub struct CookieDraft {
+    pub domain: String,
+    pub path: String,
+    pub name: String,
+    pub value: String,
+}
+
 /// An open editor tab bound to a node by its path.
 #[derive(Debug)]
 pub struct Tab {

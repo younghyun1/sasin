@@ -25,11 +25,11 @@ use iced::Task;
 
 use crate::gui::Message;
 use crate::gui::runner_state::RunnerState;
-use crate::gui::state::{Tab, WsRuntime};
+use crate::gui::state::{CookieDraft, Tab, WsRuntime};
 use crate::http::HttpClientConfig;
 use crate::model::{NodePath, Workspace};
 use crate::persist::{UiPrefs, app_state_dir, default_dataset_path};
-use crate::storage::{HistoryCache, read_history};
+use crate::storage::{HistoryCache, read_cookies, read_history};
 
 use boot::load_or_init;
 
@@ -76,6 +76,8 @@ pub struct App {
     /// History filter + visible-row cap (grown by "more").
     history_filter: String,
     history_shown: usize,
+    /// Cookie-manager add-row buffers.
+    cookie_draft: CookieDraft,
 }
 
 impl App {
@@ -85,6 +87,13 @@ impl App {
         let legacy = default_dataset_path();
         let (workspace, status) = load_or_init(&dir, &legacy);
         let history = read_history(&dir);
+        // Restore the persisted cookie jar (best-effort; a bad file just starts empty).
+        let http_config = HttpClientConfig::default();
+        if let Some(bytes) = read_cookies(&dir)
+            && let Err(e) = http_config.jar.load_json(&bytes)
+        {
+            tracing::warn!(error = %e, "Failed to restore cookie jar; starting empty");
+        }
         let active_env = if workspace.environments.is_empty() {
             None
         } else {
@@ -100,7 +109,7 @@ impl App {
             curl_import_text: String::new(),
             ws: Vec::new(),
             runner: None,
-            http_config: HttpClientConfig::default(),
+            http_config,
             send_gen: 0,
             active_abort: None,
             pretty_json: true,
@@ -117,6 +126,7 @@ impl App {
             tree_filter: String::new(),
             history_filter: String::new(),
             history_shown: HISTORY_SHOWN_DEFAULT,
+            cookie_draft: CookieDraft::default(),
         };
         (app, Task::none())
     }

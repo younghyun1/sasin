@@ -140,6 +140,18 @@ pub fn read_index(workspace_path: &Path) -> Option<IndexCache> {
     read_cache(&cache_root(workspace_path).join("index.bc.zst"))
 }
 
+/// Persist the cookie jar (already-serialized JSON) for a workspace. Lives in the cache dir,
+/// not the workspace: cookies are session/secret data and must never be committed.
+pub fn write_cookies(workspace_path: &Path, json: &[u8]) -> StorageResult<()> {
+    let root = cache_root(workspace_path);
+    write_atomic(&root.join("cookies.json"), json)
+}
+
+/// Read the persisted cookie jar JSON for a workspace, if present.
+pub fn read_cookies(workspace_path: &Path) -> Option<Vec<u8>> {
+    fs::read(cache_root(workspace_path).join("cookies.json")).ok()
+}
+
 /// Persist request history for a workspace.
 pub fn write_history(workspace_path: &Path, history: &HistoryCache) -> StorageResult<()> {
     let root = cache_root(workspace_path);
