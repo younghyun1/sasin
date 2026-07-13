@@ -28,8 +28,9 @@ impl App {
                 }
                 Task::none()
             }
-            Message::NewRequest => self.new_request(),
+            Message::NewRequest => self.new_request_in(Vec::new()),
             Message::DeleteNode(path) => self.delete_path(path),
+            Message::Tree(op) => self.tree_op(op),
             Message::SelectEnv(idx) => {
                 self.select_env(idx);
                 Task::none()
@@ -113,6 +114,10 @@ impl App {
                 Task::none()
             }
             Message::CloseTab(i) => self.close_tab(i),
+            Message::CloseActiveTab => match self.active {
+                Some(i) => self.close_tab(i),
+                None => Task::none(),
+            },
             Message::MethodChanged(method) => {
                 self.set_method(method);
                 Task::none()
@@ -253,6 +258,10 @@ impl App {
             Message::ResponseSearchChanged(text) => {
                 self.response_search = text;
                 Task::none()
+            }
+            Message::FocusResponseSearch => {
+                self.response_tab = crate::gui::messages::ResponseTab::Body;
+                iced::widget::operation::focus(crate::gui::components::response_view::search_id())
             }
             Message::SaveAsExample => self.save_as_example(),
             Message::HistoryOpen(record) => self.open_history(record),

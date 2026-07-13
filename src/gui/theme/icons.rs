@@ -29,7 +29,13 @@ pub const PLAY: char = '\u{e13c}';
 pub const TRASH: char = '\u{e18e}';
 pub const ARROW_LEFT: char = '\u{e048}';
 pub const ARROW_RIGHT: char = '\u{e049}';
+pub const ARROW_UP: char = '\u{e04a}';
+pub const ARROW_DOWN: char = '\u{e042}';
 pub const DOT: char = '\u{e44f}';
+pub const PENCIL: char = '\u{e1f9}';
+pub const COPY: char = '\u{e09e}';
+pub const PLUS: char = '\u{e13d}';
+pub const FOLDER_PLUS: char = '\u{e0d9}';
 
 /// A single icon glyph as a text widget; color/style comes from the surrounding context.
 pub fn icon<'a>(glyph: char, size: f32) -> Text<'a> {

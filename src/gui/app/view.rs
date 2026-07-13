@@ -19,12 +19,22 @@ impl App {
         let selected = self.active.and_then(|i| self.tabs.get(i)).map(|t| &t.path);
         let sidebar = container(
             column![
-                tree::view(&self.workspace, &self.expanded, selected),
+                tree::view(
+                    &self.workspace,
+                    &self.expanded,
+                    selected,
+                    self.renaming.as_ref()
+                ),
                 row![
                     button(text("New Request").size(13))
                         .padding(8)
                         .width(Length::Fill)
                         .on_press(Message::NewRequest),
+                    button(theme::icons::icon(theme::icons::FOLDER_PLUS, 13.0))
+                        .padding(8)
+                        .on_press(Message::Tree(crate::gui::messages::TreeMsg::NewFolder(
+                            Vec::new()
+                        ))),
                     button(text("Run All").size(13))
                         .padding(8)
                         .on_press(Message::OpenRunner(Vec::new())),

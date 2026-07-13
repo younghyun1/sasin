@@ -8,10 +8,12 @@ mod boot;
 mod commands;
 mod edit;
 mod edit_body;
+mod keys;
 mod nav;
 mod prefs;
 mod runner;
 mod subscriptions;
+mod tree_ops;
 mod update;
 mod view;
 mod ws;
@@ -63,6 +65,8 @@ pub struct App {
     prefs: UiPrefs,
     /// Whether `prefs` has unsaved changes (drives the flush-tick subscription).
     config_dirty: bool,
+    /// In-flight tree rename: the target path and the edit buffer.
+    renaming: Option<(NodePath, String)>,
 }
 
 impl App {
@@ -100,6 +104,7 @@ impl App {
             status,
             prefs,
             config_dirty: false,
+            renaming: None,
         };
         (app, Task::none())
     }

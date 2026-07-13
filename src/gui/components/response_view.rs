@@ -153,6 +153,7 @@ impl<'a> ResponseView<'a> {
             );
             bar = bar.push(
                 text_input("search body…", self.search)
+                    .id(search_id())
                     .on_input(Message::ResponseSearchChanged)
                     .padding(6)
                     .size(12)
@@ -275,6 +276,11 @@ fn preview_view(resp: &ResponseModel) -> Element<'static, Message> {
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
+}
+
+/// Stable widget id for the body-search input, so Ctrl+F can focus it from the shortcut map.
+pub fn search_id() -> iced::advanced::widget::Id {
+    iced::advanced::widget::Id::new("response-search")
 }
 
 /// Human-readable byte count for the stats chips.

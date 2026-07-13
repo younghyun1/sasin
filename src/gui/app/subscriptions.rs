@@ -21,6 +21,7 @@ impl App {
             })
             .collect();
         subs.push(crate::watch::watch(&self.workspace_dir).map(|()| Message::WorkspaceChanged));
+        subs.push(super::keys::subscription());
         subs.push(iced::window::resize_events().map(|(_id, size)| Message::WindowResized(size)));
         subs.push(iced::window::close_requests().map(Message::WindowCloseRequested));
         // Debounce preference writes: only tick while something actually changed.

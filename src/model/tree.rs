@@ -147,3 +147,100 @@ pub fn remove_node(roots: &mut Vec<Node>, path: &[String]) -> Option<Node> {
         }
     }
 }
+
+/// The mutable child list of the folder at `parent` (an empty path addresses the roots).
+/// `None` when the path is missing or crosses a non-folder.
+pub fn children_mut<'a>(roots: &'a mut Vec<Node>, parent: &[String]) -> Option<&'a mut Vec<Node>> {
+    let Some((first, rest)) = parent.split_first() else {
+        return Some(roots);
+    };
+    match roots.iter_mut().find(|n| n.slug() == first)? {
+        Node::Folder(folder) => children_mut(&mut folder.children, rest),
+        _ => None,
+    }
+}
+
+/// Slugs already taken among the children of `parent` (for [`unique_slug`] seeding).
+///
+/// [`unique_slug`]: crate::storage::layout::unique_slug
+pub fn sibling_slugs(roots: &[Node], parent: &[String]) -> std::collections::HashSet<String> {
+    let mut nodes = roots;
+    for seg in parent {
+        match nodes.iter().find(|n| n.slug() == seg) {
+            Some(Node::Folder(f)) => nodes = &f.children,
+            _ => return std::collections::HashSet::new(),
+        }
+    }
+    nodes.iter().map(|n| n.slug().to_string()).collect()
+}
+
+/// Insert `node` into the folder at `parent` at `index` (clamped; `None` appends).
+/// Returns whether the parent existed.
+pub fn insert_node(
+    roots: &mut Vec<Node>,
+    parent: &[String],
+    index: Option<usize>,
+    node: Node,
+) -> bool {
+    match children_mut(roots, parent) {
+        Some(children) => {
+            let at = index.unwrap_or(children.len()).min(children.len());
+            children.insert(at, node);
+            true
+        }
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn req(slug: &str) -> Node {
+        Node::Http(HttpRequest::new(slug, slug, "GET", "https://x"))
+    }
+
+    fn folder(slug: &str, children: Vec<Node>) -> Node {
+        let mut f = Folder::new(slug, slug);
+        f.children = children;
+        Node::Folder(f)
+    }
+
+    #[test]
+    fn children_mut_addresses_roots_and_nested() {
+        let mut roots = vec![folder("a", vec![req("r1")]), req("top")];
+        assert_eq!(children_mut(&mut roots, &[]).map(|c| c.len()), Some(2));
+        let a = ["a".to_string()];
+        assert_eq!(children_mut(&mut roots, &a).map(|c| c.len()), Some(1));
+        let missing = ["nope".to_string()];
+        assert!(children_mut(&mut roots, &missing).is_none());
+        let through_leaf = ["top".to_string()];
+        assert!(children_mut(&mut roots, &through_leaf).is_none());
+    }
+
+    #[test]
+    fn sibling_slugs_collects_per_parent() {
+        let roots = vec![folder("a", vec![req("r1"), req("r2")]), req("top")];
+        let at_root = sibling_slugs(&roots, &[]);
+        assert!(at_root.contains("a") && at_root.contains("top"));
+        let in_a = sibling_slugs(&roots, &["a".to_string()]);
+        assert_eq!(in_a.len(), 2);
+        assert!(in_a.contains("r1") && in_a.contains("r2"));
+    }
+
+    #[test]
+    fn insert_node_clamps_index_and_reports_missing_parent() {
+        let mut roots = vec![folder("a", vec![req("r1")])];
+        let a = ["a".to_string()];
+        assert!(insert_node(&mut roots, &a, Some(99), req("r2")));
+        assert!(insert_node(&mut roots, &a, Some(0), req("r0")));
+        let in_a = sibling_slugs(&roots, &a);
+        assert_eq!(in_a.len(), 3);
+        match find_node(&roots, &["a".to_string(), "r0".to_string()]) {
+            Some(Node::Http(r)) => assert_eq!(r.slug, "r0"),
+            other => panic!("expected r0 first, got {other:?}"),
+        }
+        let missing = ["nope".to_string()];
+        assert!(!insert_node(&mut roots, &missing, None, req("x")));
+    }
+}
