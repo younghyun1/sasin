@@ -1,4 +1,4 @@
-# Status — P0 through P8 delivered
+# Status — P0 through P9 delivered
 
 Snapshot of the execution against [03-roadmap.md](03-roadmap.md). Branch `feat/p0-stabilize`.
 
@@ -26,6 +26,8 @@ Snapshot of the execution against [03-roadmap.md](03-roadmap.md). Branch `feat/p
 | P8 S7 cookies | `1995510` | shared session cookie jar + cookie manager |
 | P8 S8 watch | `4d33d64` | notify file-watch reload on external change |
 | P8 S9 websocket | `88679b4` | WS auto-reconnect + concurrent sessions |
+| P8 review | `e593fd5` | adversarial-review fixes (see below) |
+| P9 stabilize | `b7af888` | dep upgrade: reqwest 0.13 (+`form`/`query` features), toml 1.x, rquickjs 0.12, tungstenite 0.30, minors; purged resurrected pre-refactor orphans from the working tree |
 
 Each phase: `cargo clippy --all-targets -D warnings` clean (default + `--no-default-features`),
 tests green, sillok-logged. P0/P1/P2/P3a reviewed inline; P3b–P7 and P8 each reviewed in an
@@ -76,6 +78,9 @@ adversarial review→verify workflow pass.
 - WebSocket `verify_tls=false` is not honoured (WS TLS is always verified); disabling it would
   need a hand-rolled rustls dangerous verifier + crypto provider. The WS connect timeout *is*
   applied. The HTTP path honours `verify_tls`.
+- Behavioral note (P9): reqwest 0.13 validates HTTP TLS via `rustls-platform-verifier` (the OS
+  trust store) instead of bundled webpki roots — corporate/self-signed CAs installed system-wide
+  now work without `verify_tls=false`.
 
 ## P8 adversarial review
 
