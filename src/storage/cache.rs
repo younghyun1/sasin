@@ -34,6 +34,8 @@ pub struct IndexEntry {
     pub name: String,
     /// HTTP method for request nodes; empty otherwise.
     pub method: String,
+    /// Request URL (http and ws nodes); empty for folders. Searchable.
+    pub url: String,
 }
 
 /// Flattened tree index for fast sidebar render + search.
@@ -90,6 +92,7 @@ fn collect_index(nodes: &[Node], prefix: &str, out: &mut Vec<IndexEntry>) {
                     kind: KIND_FOLDER,
                     name: f.name.clone(),
                     method: String::new(),
+                    url: String::new(),
                 });
                 collect_index(&f.children, &path, out);
             }
@@ -98,12 +101,14 @@ fn collect_index(nodes: &[Node], prefix: &str, out: &mut Vec<IndexEntry>) {
                 kind: KIND_HTTP,
                 name: r.name.clone(),
                 method: r.method.clone(),
+                url: r.url.clone(),
             }),
             Node::Ws(w) => out.push(IndexEntry {
                 path,
                 kind: KIND_WS,
                 name: w.name.clone(),
                 method: String::new(),
+                url: w.url.clone(),
             }),
         }
     }

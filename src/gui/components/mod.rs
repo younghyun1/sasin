@@ -9,6 +9,7 @@ pub mod history_panel;
 pub mod kv_table;
 pub mod response_view;
 pub mod runner_panel;
+pub mod search_list;
 pub mod split;
 pub mod tab_strip;
 pub mod tabs;

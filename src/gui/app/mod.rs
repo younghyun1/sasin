@@ -33,6 +33,10 @@ use crate::storage::{HistoryCache, read_history};
 
 use boot::load_or_init;
 
+/// Initial number of history rows; "more" grows it by [`HISTORY_SHOWN_STEP`].
+const HISTORY_SHOWN_DEFAULT: usize = 10;
+const HISTORY_SHOWN_STEP: usize = 25;
+
 /// The application state.
 pub struct App {
     workspace_dir: PathBuf,
@@ -67,6 +71,11 @@ pub struct App {
     config_dirty: bool,
     /// In-flight tree rename: the target path and the edit buffer.
     renaming: Option<(NodePath, String)>,
+    /// Sidebar search filter; non-empty swaps the tree for a flat match list.
+    tree_filter: String,
+    /// History filter + visible-row cap (grown by "more").
+    history_filter: String,
+    history_shown: usize,
 }
 
 impl App {
@@ -105,6 +114,9 @@ impl App {
             prefs,
             config_dirty: false,
             renaming: None,
+            tree_filter: String::new(),
+            history_filter: String::new(),
+            history_shown: HISTORY_SHOWN_DEFAULT,
         };
         (app, Task::none())
     }

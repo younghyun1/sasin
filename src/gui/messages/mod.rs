@@ -194,6 +194,12 @@ pub enum Message {
 
     // --- History ---
     HistoryOpen(HistoryRecord),
+    HistoryFilterChanged(String),
+    HistoryShowMore,
+    HistoryClear,
+
+    // --- Sidebar search ---
+    TreeFilterChanged(String),
 
     // --- Cookie manager ---
     ToggleCookieManager,

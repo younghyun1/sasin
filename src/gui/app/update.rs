@@ -267,6 +267,24 @@ impl App {
             Message::SaveBodyToFile => self.save_body_to_file(),
             Message::CopyBody => self.copy_body(),
             Message::HistoryOpen(record) => self.open_history(record),
+            Message::HistoryFilterChanged(text) => {
+                self.history_filter = text;
+                Task::none()
+            }
+            Message::HistoryShowMore => {
+                self.history_shown += crate::gui::app::HISTORY_SHOWN_STEP;
+                Task::none()
+            }
+            Message::HistoryClear => {
+                self.history.records.clear();
+                self.history_shown = crate::gui::app::HISTORY_SHOWN_DEFAULT;
+                self.status = Some("History cleared.".to_string());
+                self.persist_history()
+            }
+            Message::TreeFilterChanged(text) => {
+                self.tree_filter = text;
+                Task::none()
+            }
             Message::ToggleCookieManager => {
                 self.show_cookies = !self.show_cookies;
                 Task::none()

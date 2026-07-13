@@ -14,8 +14,8 @@ pub(crate) mod io_util;
 mod tests;
 
 pub use cache::{
-    HistoryCache, HistoryRecord, IndexCache, IndexEntry, build_index, ensure_gitignore,
-    read_history, read_index, write_history, write_index,
+    HistoryCache, HistoryRecord, IndexCache, IndexEntry, KIND_FOLDER, KIND_HTTP, KIND_WS,
+    build_index, ensure_gitignore, read_history, read_index, write_history, write_index,
 };
 pub use error::{StorageError, StorageResult};
 pub use load::load_workspace;

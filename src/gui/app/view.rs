@@ -7,7 +7,7 @@ use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::components::{
     ResponseView, Split, SplitAxis, cookie_manager, editor, env_panel, history_panel, runner_panel,
-    tabs, tree, ws_console,
+    search_list, tabs, tree, ws_console,
 };
 use crate::gui::messages::SplitId;
 use crate::gui::state::Tab;
@@ -17,14 +17,26 @@ use crate::model::{Node, find_node};
 impl App {
     pub fn view(&self) -> Element<'_, Message> {
         let selected = self.active.and_then(|i| self.tabs.get(i)).map(|t| &t.path);
+        // While the filter is non-empty the tree is replaced by a flat match list.
+        let tree_area: Element<'_, Message> = if self.tree_filter.trim().is_empty() {
+            tree::view(
+                &self.workspace,
+                &self.expanded,
+                selected,
+                self.renaming.as_ref(),
+            )
+        } else {
+            let index = crate::storage::build_index(&self.workspace_dir, &self.workspace);
+            search_list::view(&index.entries, self.tree_filter.trim())
+        };
         let sidebar = container(
             column![
-                tree::view(
-                    &self.workspace,
-                    &self.expanded,
-                    selected,
-                    self.renaming.as_ref()
-                ),
+                text_input("search requests…", &self.tree_filter)
+                    .on_input(Message::TreeFilterChanged)
+                    .padding(6)
+                    .size(12)
+                    .width(Length::Fill),
+                tree_area,
                 row![
                     button(text("New Request").size(13))
                         .padding(8)
@@ -44,7 +56,7 @@ impl App {
                 ]
                 .spacing(6),
                 env_panel::view(&self.workspace.environments, self.active_env),
-                history_panel::view(&self.history),
+                history_panel::view(&self.history, &self.history_filter, self.history_shown),
                 row![
                     text_input("paste curl…", &self.curl_import_text)
                         .on_input(Message::CurlImportChanged)
