@@ -8,6 +8,7 @@ use reqwest::header::{HeaderName, HeaderValue};
 
 use crate::http::auth::apply_auth;
 use crate::http::body::apply_body;
+use crate::http::capture;
 use crate::http::client::HttpClientConfig;
 use crate::model::{HttpRequest, KvEntry};
 use crate::models::ResponseModel;
@@ -33,17 +34,37 @@ pub async fn execute(
     rb = apply_body(rb, &request.body, base_dir, user_content_type).await?;
 
     let start = Instant::now();
-    let res = rb.send().await.map_err(|e| e.to_string())?;
+    let mut res = rb.send().await.map_err(|e| e.to_string())?;
     let status = res.status();
     let headers = res.headers().clone();
-    let body = res.text().await.map_err(|e| e.to_string())?;
-    Ok(ResponseModel::new(
+
+    // Bounded, chunked capture: stop at the cap instead of buffering arbitrarily large bodies.
+    let mut bytes: Vec<u8> = Vec::new();
+    let mut truncated = false;
+    while let Some(chunk) = res.chunk().await.map_err(|e| e.to_string())? {
+        if bytes.len() + chunk.len() > capture::MAX_CAPTURE_BYTES {
+            let take = capture::MAX_CAPTURE_BYTES - bytes.len();
+            bytes.extend_from_slice(&chunk[..take]);
+            truncated = true;
+            break;
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let content_type = headers
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
+    let body = capture::classify(content_type.as_deref(), bytes);
+
+    let mut model = ResponseModel::new(
         status.as_u16(),
         reason(status),
         headers,
         body,
         start.elapsed(),
-    ))
+    );
+    model.truncated = truncated;
+    Ok(model)
 }
 
 fn build_client(
@@ -86,8 +107,8 @@ pub(crate) fn parse_method(method: &str) -> Result<reqwest::Method, String> {
         .map_err(|e| format!("Invalid method `{method}`: {e}"))
 }
 
-/// Merge enabled query params into the URL. Falls back to raw append when the base does not parse
-/// (e.g. still contains `{{vars}}` before interpolation lands in P4).
+/// Merge enabled query params into the URL. Falls back to raw append when the base does not
+/// parse (e.g. when it still contains uninterpolated `{{vars}}`).
 pub(crate) fn effective_url(base: &str, params: &[KvEntry]) -> Result<String, String> {
     let enabled: Vec<(&str, &str)> = params
         .iter()

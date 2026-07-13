@@ -121,6 +121,54 @@ impl App {
         )
     }
 
+    /// Save the active response body to a user-picked file (native save dialog).
+    pub(super) fn save_body_to_file(&mut self) -> Task<Message> {
+        let Some(i) = self.active else {
+            return Task::none();
+        };
+        let Some(resp) = self.tabs[i].response.clone() else {
+            return notice("No response to save yet.");
+        };
+        let url = match find_node(&self.workspace.root, &self.tabs[i].path) {
+            Some(Node::Http(r)) => r.url.clone(),
+            _ => String::new(),
+        };
+        let suggested = suggest_file_name(&url, &resp);
+        Task::perform(
+            async move {
+                let Some(handle) = rfd::AsyncFileDialog::new()
+                    .set_file_name(&suggested)
+                    .save_file()
+                    .await
+                else {
+                    return Message::Ignore;
+                };
+                let path = handle.path().to_path_buf();
+                let bytes = resp.body.bytes().to_vec();
+                let written =
+                    tokio::task::spawn_blocking(move || std::fs::write(&path, bytes)).await;
+                match written {
+                    Ok(Ok(())) => {
+                        Message::Notice(format!("Saved body: {}", handle.path().display()))
+                    }
+                    Ok(Err(e)) => Message::Notice(format!("Body save failed: {e}")),
+                    Err(e) => Message::Notice(format!("Body save failed: {e}")),
+                }
+            },
+            |m| m,
+        )
+    }
+
+    /// Copy the active response body to the clipboard (lossy for binary).
+    pub(super) fn copy_body(&mut self) -> Task<Message> {
+        let Some(resp) = self.active.and_then(|i| self.tabs[i].response.as_ref()) else {
+            return Task::none();
+        };
+        let body = resp.body.text_lossy().into_owned();
+        self.status = Some("Copied response body.".to_string());
+        iced::clipboard::write(body)
+    }
+
     /// Run the active tab's test script against its response, recording results on the tab.
     pub(super) fn run_test_script(&mut self, pos: usize) {
         let Some(path) = self.tabs.get(pos).map(|t| t.path.clone()) else {
@@ -279,7 +327,58 @@ fn notice(message: &str) -> Task<Message> {
     Task::perform(async move { message }, Message::Notice)
 }
 
+/// Suggest a save-file name: the URL's last path segment, else "response" + an extension
+/// derived from the content type.
+fn suggest_file_name(url: &str, resp: &ResponseModel) -> String {
+    let segment = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| {
+            u.path_segments()
+                .and_then(|mut s| s.next_back().map(str::to_owned))
+        })
+        .filter(|s| !s.is_empty());
+    if let Some(name) = &segment
+        && name.contains('.')
+    {
+        return name.clone();
+    }
+    let base = segment.unwrap_or_else(|| "response".to_string());
+    let content_type = resp
+        .headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let ext = extension_for(content_type, resp.body.as_text().is_some());
+    format!("{base}.{ext}")
+}
+
+fn extension_for(content_type: &str, is_text: bool) -> &'static str {
+    let ct = content_type.to_ascii_lowercase();
+    if ct.contains("json") {
+        "json"
+    } else if ct.contains("html") {
+        "html"
+    } else if ct.contains("xml") {
+        "xml"
+    } else if ct.contains("png") {
+        "png"
+    } else if ct.contains("jpeg") || ct.contains("jpg") {
+        "jpg"
+    } else if ct.contains("gif") {
+        "gif"
+    } else if ct.contains("svg") {
+        "svg"
+    } else if ct.contains("pdf") {
+        "pdf"
+    } else if is_text {
+        "txt"
+    } else {
+        "bin"
+    }
+}
+
 /// Render a response as a readable `.http`-style dump (status line, headers, blank line, body).
+/// Binary bodies are noted instead of dumped (the dump is meant to be human-readable).
 fn format_example(resp: &ResponseModel) -> String {
     let mut out = format!("HTTP {} {}\n", resp.status.code, resp.status.reason);
     for (name, value) in resp.headers.iter() {
@@ -289,6 +388,9 @@ fn format_example(resp: &ResponseModel) -> String {
         out.push('\n');
     }
     out.push('\n');
-    out.push_str(&resp.body);
+    match resp.body.as_text() {
+        Some(body) => out.push_str(body),
+        None => out.push_str(&format!("<binary body: {} bytes>", resp.body.len())),
+    }
     out
 }

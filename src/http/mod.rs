@@ -5,6 +5,7 @@
 
 pub mod auth;
 pub mod body;
+pub mod capture;
 pub mod client;
 pub mod cookies;
 pub mod exec;

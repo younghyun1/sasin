@@ -1,11 +1,11 @@
-//! Response panel: stats line, a tab bar (Body / Headers / Cookies / Preview), a body search box,
-//! and a save-as-example action. The component is stateless — it renders from the flags the parent
-//! ([`App`](crate::gui::app::App)) owns and emits messages back.
+//! The response panel renderer. The component is stateless — it renders from the flags the
+//! parent ([`App`](crate::gui::app::App)) owns and emits messages back.
 
 use iced::alignment::Vertical;
 use iced::widget::{Space, button, column, container, row, scrollable, text, text_input};
 use iced::{Element, Length};
 
+use super::format::{HEX_PREVIEW_BYTES, filter_search, format_body, format_bytes, hex_dump};
 use crate::gui::Message;
 use crate::gui::components::tab_strip;
 use crate::gui::messages::ResponseTab;
@@ -162,6 +162,18 @@ impl<'a> ResponseView<'a> {
         }
         bar = bar.push(Space::new().width(Length::Fill));
         bar = bar.push(
+            button(text("Copy body").size(12))
+                .padding(6)
+                .style(theme::flat)
+                .on_press(Message::CopyBody),
+        );
+        bar = bar.push(
+            button(text("Save body").size(12))
+                .padding(6)
+                .style(theme::flat)
+                .on_press(Message::SaveBodyToFile),
+        );
+        bar = bar.push(
             button(text("Save example").size(12))
                 .padding(6)
                 .style(theme::flat)
@@ -171,13 +183,39 @@ impl<'a> ResponseView<'a> {
     }
 
     fn body_view(&self, resp: &'a ResponseModel) -> Element<'a, Message> {
-        let formatted = format_body(&resp.body, self.pretty_json);
-        let (shown, header) = filter_search(&formatted, self.search);
         let mut col = column![].spacing(4).width(Length::Fill);
-        if let Some(h) = header {
-            col = col.push(text(h).size(11));
+        if resp.truncated {
+            col = col.push(
+                text("Body truncated at the 10 MB capture cap.")
+                    .size(11)
+                    .style(theme::muted),
+            );
         }
-        col = col.push(text(shown).size(12).font(theme::fonts::MONO));
+        match resp.body.as_text() {
+            Some(body) => {
+                let formatted = format_body(body, self.pretty_json);
+                let (shown, header) = filter_search(&formatted, self.search);
+                if let Some(h) = header {
+                    col = col.push(text(h).size(11));
+                }
+                col = col.push(text(shown).size(12).font(theme::fonts::MONO));
+            }
+            None => {
+                col = col.push(
+                    text(format!(
+                        "Binary body, {}. First {} shown as hex; use \"Save body\" for the file.",
+                        format_bytes(resp.body.len()),
+                        format_bytes(HEX_PREVIEW_BYTES.min(resp.body.len())),
+                    ))
+                    .size(12),
+                );
+                col = col.push(
+                    text(hex_dump(resp.body.bytes(), HEX_PREVIEW_BYTES))
+                        .size(12)
+                        .font(theme::fonts::MONO),
+                );
+            }
+        }
         scrollable(col)
             .height(Length::Fill)
             .width(Length::Fill)
@@ -250,27 +288,43 @@ fn preview_view(resp: &ResponseModel) -> Element<'static, Message> {
         .unwrap_or("")
         .to_ascii_lowercase();
     let body: Element<'static, Message> = if content_type.contains("image") {
-        text(format!(
-            "Image response ({content_type}). Inline image preview is not supported; \
-             save the body to a file to view it."
-        ))
-        .size(13)
+        // Decoding happens in the image widget; unsupported formats show as blank.
+        let handle = iced::widget::image::Handle::from_bytes(resp.body.bytes().to_vec());
+        scrollable(
+            container(iced::widget::image(handle))
+                .center_x(Length::Fill)
+                .padding(10),
+        )
+        .height(Length::Fill)
+        .width(Length::Fill)
         .into()
     } else if content_type.contains("html") {
         // No HTML renderer available; show the markup source.
-        scrollable(text(resp.body.clone()).size(12).font(theme::fonts::MONO))
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .into()
-    } else {
         scrollable(
-            text(format_body(&resp.body, true))
+            text(resp.body.text_lossy().into_owned())
                 .size(12)
                 .font(theme::fonts::MONO),
         )
         .height(Length::Fill)
         .width(Length::Fill)
         .into()
+    } else {
+        match resp.body.as_text() {
+            Some(body) => scrollable(
+                text(format_body(body, true))
+                    .size(12)
+                    .font(theme::fonts::MONO),
+            )
+            .height(Length::Fill)
+            .width(Length::Fill)
+            .into(),
+            None => text(format!(
+                "Binary body ({}); no preview for `{content_type}`.",
+                format_bytes(resp.body.len())
+            ))
+            .size(13)
+            .into(),
+        }
     };
     container(body)
         .width(Length::Fill)
@@ -281,45 +335,4 @@ fn preview_view(resp: &ResponseModel) -> Element<'static, Message> {
 /// Stable widget id for the body-search input, so Ctrl+F can focus it from the shortcut map.
 pub fn search_id() -> iced::advanced::widget::Id {
     iced::advanced::widget::Id::new("response-search")
-}
-
-/// Human-readable byte count for the stats chips.
-fn format_bytes(n: usize) -> String {
-    if n >= 1024 * 1024 {
-        format!("{:.1} MB", n as f64 / (1024.0 * 1024.0))
-    } else if n >= 1024 {
-        format!("{:.1} KB", n as f64 / 1024.0)
-    } else {
-        format!("{n} B")
-    }
-}
-
-/// Best-effort body formatting: pretty-print JSON when enabled and parseable, else the raw body.
-fn format_body(body: &str, pretty_json: bool) -> String {
-    if body.is_empty() {
-        return "<empty body>".to_string();
-    }
-    if pretty_json
-        && let Ok(value) = serde_json::from_str::<serde_json::Value>(body)
-        && let Ok(pretty) = serde_json::to_string_pretty(&value)
-    {
-        return pretty;
-    }
-    body.to_string()
-}
-
-/// Filter `text` to lines containing `query` (case-insensitive). Returns the text to show plus an
-/// optional match-count header. An empty query returns the text unchanged.
-fn filter_search(text: &str, query: &str) -> (String, Option<String>) {
-    let query = query.trim();
-    if query.is_empty() {
-        return (text.to_string(), None);
-    }
-    let needle = query.to_ascii_lowercase();
-    let matches: Vec<&str> = text
-        .lines()
-        .filter(|line| line.to_ascii_lowercase().contains(&needle))
-        .collect();
-    let header = format!("{} matching line(s) for \"{query}\"", matches.len());
-    (matches.join("\n"), Some(header))
 }

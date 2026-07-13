@@ -189,6 +189,8 @@ pub enum Message {
     ResponseSearchChanged(String),
     FocusResponseSearch,
     SaveAsExample,
+    SaveBodyToFile,
+    CopyBody,
 
     // --- History ---
     HistoryOpen(HistoryRecord),

@@ -264,6 +264,8 @@ impl App {
                 iced::widget::operation::focus(crate::gui::components::response_view::search_id())
             }
             Message::SaveAsExample => self.save_as_example(),
+            Message::SaveBodyToFile => self.save_body_to_file(),
+            Message::CopyBody => self.copy_body(),
             Message::HistoryOpen(record) => self.open_history(record),
             Message::ToggleCookieManager => {
                 self.show_cookies = !self.show_cookies;

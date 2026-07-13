@@ -152,7 +152,8 @@ fn eval_json(ctx: &Ctx<'_>, global: &str) -> String {
 }
 
 fn response_js(r: &ResponseModel) -> String {
-    let body = serde_json::to_string(&r.body).unwrap_or_else(|_| "\"\"".to_string());
+    // Scripts see the body as text (Postman-compatible); binary bodies decode lossily.
+    let body = serde_json::to_string(&*r.body.text_lossy()).unwrap_or_else(|_| "\"\"".to_string());
     let status = serde_json::to_string(&r.status.reason).unwrap_or_else(|_| "\"\"".to_string());
     let headers: HashMap<String, String> = r
         .headers
