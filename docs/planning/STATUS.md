@@ -1,4 +1,4 @@
-# Status — P0 through P9 delivered
+# Status — P0 through P10 delivered
 
 Snapshot of the execution against [03-roadmap.md](03-roadmap.md). Branch `feat/p0-stabilize`.
 
@@ -28,6 +28,9 @@ Snapshot of the execution against [03-roadmap.md](03-roadmap.md). Branch `feat/p
 | P8 S9 websocket | `88679b4` | WS auto-reconnect + concurrent sessions |
 | P8 review | `e593fd5` | adversarial-review fixes (see below) |
 | P9 stabilize | `b7af888` | dep upgrade: reqwest 0.13 (+`form`/`query` features), toml 1.x, rquickjs 0.12, tungstenite 0.30, minors; purged resurrected pre-refactor orphans from the working tree |
+| P10 W1+W2 | `206af63` | custom dark/light theme (Postman-orange accent, dark default) + persisted TOML UI prefs (window, splits, theme) |
+| P10 W3-W5 | `d29a157` | embedded Inter / JetBrains Mono / Lucide fonts; mono code surfaces; highlighter follows theme |
+| P10 W6+W7 | `b8268a6` | split widget restructure + themed divider (hover/drag accent); component polish: underline tabs, status pill/chips, tree icons + aligned badges, KV headers, status bar |
 
 Each phase: `cargo clippy --all-targets -D warnings` clean (default + `--no-default-features`),
 tests green, sillok-logged. P0/P1/P2/P3a reviewed inline; P3b–P7 and P8 each reviewed in an
