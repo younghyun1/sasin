@@ -13,10 +13,11 @@ use crate::gui::messages::{
     AuthChoice, AuthFieldKind, BodyModeChoice, EditorPanel, KvOp, KvTarget, SettingFlag,
 };
 use crate::gui::state::Tab;
+use crate::gui::theme::fonts;
 use crate::model::{ApiKeyLoc, Auth, Body, FormKind, FormPart, HttpRequest, RawLang};
 
-/// Editor highlight theme (light, to match iced's default light theme).
-const HL_THEME: iced::highlighter::Theme = iced::highlighter::Theme::InspiredGitHub;
+/// Editor highlight theme, synced with the app theme by the caller.
+type HlTheme = iced::highlighter::Theme;
 
 /// Map a raw-body language to the syntect token the highlighter resolves.
 fn syntax_token(lang: RawLang) -> &'static str {
@@ -30,31 +31,33 @@ fn syntax_token(lang: RawLang) -> &'static str {
 }
 
 /// Render the active panel.
-pub fn view<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
+pub fn view<'a>(req: &'a HttpRequest, tab: &'a Tab, hl: HlTheme) -> Element<'a, Message> {
     match tab.panel {
         EditorPanel::Params => kv_table::view(KvTarget::Params, &req.params, "key", "value"),
         EditorPanel::Headers => kv_table::view(KvTarget::Headers, &req.headers, "Header", "Value"),
         EditorPanel::Auth => auth_panel(&req.auth),
-        EditorPanel::Body => body_panel(req, tab),
-        EditorPanel::Scripts => scripts_panel(tab),
+        EditorPanel::Body => body_panel(req, tab, hl),
+        EditorPanel::Scripts => scripts_panel(tab, hl),
         EditorPanel::Settings => settings_panel(req, tab),
     }
 }
 
-fn scripts_panel(tab: &Tab) -> Element<'_, Message> {
+fn scripts_panel(tab: &Tab, hl: HlTheme) -> Element<'_, Message> {
     column![
         text("Pre-request script").size(13),
         text_editor(&tab.pre_script)
             .placeholder("pm.environment.set('ts', Date.now())")
             .on_action(Message::PreScriptAction)
             .height(Length::Fixed(150.0))
-            .highlight("js", HL_THEME),
+            .font(fonts::MONO)
+            .highlight("js", hl),
         text("Test script").size(13),
         text_editor(&tab.test_script)
             .placeholder("pm.test('status ok', () => pm.response.to.have.status(200))")
             .on_action(Message::TestScriptAction)
             .height(Length::Fixed(150.0))
-            .highlight("js", HL_THEME),
+            .font(fonts::MONO)
+            .highlight("js", hl),
     ]
     .spacing(6)
     .width(Length::Fill)
@@ -112,7 +115,7 @@ fn auth_panel(auth: &Auth) -> Element<'_, Message> {
         .into()
 }
 
-fn body_panel<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
+fn body_panel<'a>(req: &'a HttpRequest, tab: &'a Tab, hl: HlTheme) -> Element<'a, Message> {
     let selector = pick_list(
         BodyModeChoice::all(),
         Some(body_choice(&req.body)),
@@ -127,7 +130,8 @@ fn body_panel<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
                 .placeholder("Raw body…")
                 .on_action(Message::BodyAction)
                 .height(Length::Fixed(240.0))
-                .highlight(syntax_token(*language), HL_THEME),
+                .font(fonts::MONO)
+                .highlight(syntax_token(*language), hl),
         ]
         .spacing(6)
         .into(),
@@ -150,13 +154,15 @@ fn body_panel<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
                 .placeholder("query { … }")
                 .on_action(Message::BodyAction)
                 .height(Length::Fixed(160.0))
-                .highlight("graphql", HL_THEME),
+                .font(fonts::MONO)
+                .highlight("graphql", hl),
             text("Variables (JSON)").size(13),
             text_editor(&tab.gql_vars)
                 .placeholder("{}")
                 .on_action(Message::GqlVarsAction)
                 .height(Length::Fixed(100.0))
-                .highlight("json", HL_THEME),
+                .font(fonts::MONO)
+                .highlight("json", hl),
         ]
         .spacing(6)
         .into(),

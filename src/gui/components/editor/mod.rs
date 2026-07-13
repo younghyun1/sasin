@@ -14,7 +14,11 @@ use crate::model::HttpRequest;
 use crate::models::HttpMethod;
 
 /// Render the editor for an HTTP request node + its tab buffers.
-pub fn view<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
+pub fn view<'a>(
+    req: &'a HttpRequest,
+    tab: &'a Tab,
+    hl: iced::highlighter::Theme,
+) -> Element<'a, Message> {
     let method = pick_list(
         HttpMethod::all(),
         HttpMethod::parse(&req.method),
@@ -56,7 +60,7 @@ pub fn view<'a>(req: &'a HttpRequest, tab: &'a Tab) -> Element<'a, Message> {
         actions,
         Space::new().height(Length::Fixed(8.0)),
         panel_bar(tab.panel),
-        panels::view(req, tab),
+        panels::view(req, tab, hl),
     ]
     .spacing(8)
     .width(Length::Fill);

@@ -31,7 +31,7 @@ impl App {
                     button(text("Cookies").size(13))
                         .padding(8)
                         .on_press(Message::ToggleCookieManager),
-                    button(text(theme_glyph(self.prefs.theme)).size(13))
+                    button(theme_icon(self.prefs.theme))
                         .padding(8)
                         .on_press(Message::ToggleTheme),
                 ]
@@ -43,6 +43,7 @@ impl App {
                         .on_input(Message::CurlImportChanged)
                         .padding(6)
                         .size(12)
+                        .font(theme::fonts::MONO)
                         .width(Length::Fill),
                     button(text("Import").size(12))
                         .padding(6)
@@ -63,7 +64,9 @@ impl App {
         let editor_area: Element<'_, Message> = match active_tab {
             Some(tab) => {
                 let panel: Element<'_, Message> = match find_node(&self.workspace.root, &tab.path) {
-                    Some(Node::Http(req)) => editor::view(req, tab),
+                    Some(Node::Http(req)) => {
+                        editor::view(req, tab, theme::code_theme(self.prefs.theme))
+                    }
                     Some(Node::Ws(req)) => {
                         let rt = self.ws.iter().find(|r| r.path == tab.path);
                         ws_console::view(req, rt)
@@ -133,12 +136,13 @@ impl App {
     }
 }
 
-/// Temporary theme-toggle affordance (an icon button replaces this in the polish pass).
-fn theme_glyph(theme: crate::persist::ThemeChoice) -> &'static str {
-    match theme {
-        crate::persist::ThemeChoice::Dark => "☀",
-        crate::persist::ThemeChoice::Light => "☾",
-    }
+/// Theme-toggle icon: shows the theme you would switch to.
+fn theme_icon<'a>(choice: crate::persist::ThemeChoice) -> iced::widget::Text<'a> {
+    let glyph = match choice {
+        crate::persist::ThemeChoice::Dark => theme::icons::SUN,
+        crate::persist::ThemeChoice::Light => theme::icons::MOON,
+    };
+    theme::icons::icon(glyph, 13.0)
 }
 
 /// A compact strip of test results + console output from the last script run (empty when none).

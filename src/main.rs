@@ -52,6 +52,11 @@ fn main() -> iced::Result {
     .title(crate::gui::App::title)
     .theme(crate::gui::App::theme)
     .subscription(crate::gui::App::subscription)
+    .font(crate::gui::theme::fonts::BYTES_UI)
+    .font(crate::gui::theme::fonts::BYTES_UI_SEMIBOLD)
+    .font(crate::gui::theme::fonts::BYTES_MONO)
+    .font(crate::gui::theme::icons::BYTES)
+    .default_font(crate::gui::theme::fonts::UI)
     .window(window)
     // Close is intercepted so preferences flush before exit (see `App::close_requested`).
     .exit_on_close_request(false)

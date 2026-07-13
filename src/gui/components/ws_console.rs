@@ -6,6 +6,7 @@ use iced::{Element, Length};
 
 use crate::gui::Message;
 use crate::gui::state::{WsDir, WsRuntime};
+use crate::gui::theme;
 use crate::model::{WsKind, WsRequest};
 
 /// Render the console for a websocket node. `rt` is the live session when this node is connected.
@@ -44,7 +45,11 @@ pub fn view<'a>(req: &'a WsRequest, rt: Option<&'a WsRuntime>) -> Element<'a, Me
                     WsDir::Out => "→",
                     WsDir::Info => "•",
                 };
-                col = col.push(text(format!("{prefix} {}", line.text)).size(12));
+                col = col.push(
+                    text(format!("{prefix} {}", line.text))
+                        .size(12)
+                        .font(theme::fonts::MONO),
+                );
             }
             scrollable(col)
                 .height(Length::Fill)

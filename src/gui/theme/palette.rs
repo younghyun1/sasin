@@ -20,6 +20,15 @@ pub fn app_theme(choice: ThemeChoice) -> Theme {
     }
 }
 
+/// Syntax-highlight theme matching the app theme. `InspiredGitHub` is the only light theme
+/// iced's highlighter ships; `Base16Ocean` is the most neutral of its dark options.
+pub fn code_theme(choice: ThemeChoice) -> iced::highlighter::Theme {
+    match choice {
+        ThemeChoice::Dark => iced::highlighter::Theme::Base16Ocean,
+        ThemeChoice::Light => iced::highlighter::Theme::InspiredGitHub,
+    }
+}
+
 static DARK: LazyLock<Theme> = LazyLock::new(|| {
     let base = Palette {
         background: hex(0x1e1e1e),

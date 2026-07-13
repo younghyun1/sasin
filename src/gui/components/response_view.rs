@@ -164,7 +164,7 @@ impl<'a> ResponseView<'a> {
         if let Some(h) = header {
             col = col.push(text(h).size(11));
         }
-        col = col.push(text(shown).size(12));
+        col = col.push(text(shown).size(12).font(theme::fonts::MONO));
         scrollable(col)
             .height(Length::Fill)
             .width(Length::Fill)
@@ -197,7 +197,7 @@ fn headers_view(resp: &ResponseModel) -> Element<'static, Message> {
     if block.is_empty() {
         block.push_str("<no headers>");
     }
-    scrollable(text(block).size(12))
+    scrollable(text(block).size(12).font(theme::fonts::MONO))
         .height(Length::Fill)
         .width(Length::Fill)
         .into()
@@ -245,15 +245,19 @@ fn preview_view(resp: &ResponseModel) -> Element<'static, Message> {
         .into()
     } else if content_type.contains("html") {
         // No HTML renderer available; show the markup source.
-        scrollable(text(resp.body.clone()).size(12))
+        scrollable(text(resp.body.clone()).size(12).font(theme::fonts::MONO))
             .height(Length::Fill)
             .width(Length::Fill)
             .into()
     } else {
-        scrollable(text(format_body(&resp.body, true)).size(12))
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .into()
+        scrollable(
+            text(format_body(&resp.body, true))
+                .size(12)
+                .font(theme::fonts::MONO),
+        )
+        .height(Length::Fill)
+        .width(Length::Fill)
+        .into()
     };
     container(body)
         .width(Length::Fill)

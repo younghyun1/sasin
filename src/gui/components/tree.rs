@@ -148,7 +148,8 @@ fn leaf_row(
 fn method_badge(method: &str) -> Element<'static, Message> {
     let m = method.to_string();
     text(m.clone())
-        .size(11)
+        .size(10)
+        .font(theme::fonts::MONO)
         .style(move |theme| iced::widget::text::Style {
             color: Some(theme::method_color(&m, theme)),
         })

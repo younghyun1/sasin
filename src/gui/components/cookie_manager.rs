@@ -31,7 +31,9 @@ pub fn view(cookies: &[CookieView]) -> Element<'static, Message> {
     for c in cookies {
         list = list.push(
             column![
-                text(format!("{} = {}", c.name, c.value)).size(13),
+                text(format!("{} = {}", c.name, c.value))
+                    .size(13)
+                    .font(theme::fonts::MONO),
                 text(format!("    domain {} · path {}", c.domain, c.path)).size(11),
             ]
             .spacing(2),
