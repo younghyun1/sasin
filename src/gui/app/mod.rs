@@ -9,7 +9,9 @@ mod commands;
 mod edit;
 mod edit_body;
 mod nav;
+mod prefs;
 mod runner;
+mod subscriptions;
 mod update;
 mod view;
 mod ws;
@@ -24,7 +26,7 @@ use crate::gui::runner_state::RunnerState;
 use crate::gui::state::{Tab, WsRuntime};
 use crate::http::HttpClientConfig;
 use crate::model::{NodePath, Workspace};
-use crate::persist::{app_state_dir, default_dataset_path};
+use crate::persist::{UiPrefs, app_state_dir, default_dataset_path};
 use crate::storage::{HistoryCache, read_history};
 
 use boot::load_or_init;
@@ -57,11 +59,15 @@ pub struct App {
     /// Persisted, recently-sent requests (newest last); shown in the sidebar.
     history: HistoryCache,
     status: Option<String>,
+    /// Persisted UI preferences (theme, window, layout).
+    prefs: UiPrefs,
+    /// Whether `prefs` has unsaved changes (drives the flush-tick subscription).
+    config_dirty: bool,
 }
 
 impl App {
     /// Boot: locate the workspace directory, loading/migrating/initializing as needed.
-    pub fn new() -> (Self, Task<Message>) {
+    pub fn new(prefs: UiPrefs) -> (Self, Task<Message>) {
         let dir = app_state_dir().join("workspace");
         let legacy = default_dataset_path();
         let (workspace, status) = load_or_init(&dir, &legacy);
@@ -88,12 +94,19 @@ impl App {
             response_tab: crate::gui::messages::ResponseTab::Body,
             response_search: String::new(),
             show_cookies: false,
-            sidebar_px: 300.0,
-            editor_px: 360.0,
+            sidebar_px: prefs.layout.sidebar_px,
+            editor_px: prefs.layout.editor_px,
             history,
             status,
+            prefs,
+            config_dirty: false,
         };
         (app, Task::none())
+    }
+
+    /// The active theme (bound via `Application::theme`).
+    pub fn theme(&self) -> iced::Theme {
+        crate::gui::theme::app_theme(self.prefs.theme)
     }
 
     /// Window title (bound via `Application::title`).

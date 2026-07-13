@@ -200,8 +200,13 @@ pub enum Message {
     /// A no-op (used by fire-and-forget tasks that produce nothing to handle).
     Ignore,
 
-    // --- Layout ---
+    // --- Layout / preferences ---
     SplitDragged(SplitId, f32),
+    ToggleTheme,
+    WindowResized(iced::Size),
+    WindowCloseRequested(iced::window::Id),
+    /// Debounced tick that flushes dirty preferences to disk.
+    ConfigFlushTick,
 }
 
 impl BodyModeChoice {

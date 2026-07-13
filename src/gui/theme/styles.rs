@@ -1,7 +1,5 @@
-//! Centralized styling helpers, kept in one place per the project's styling convention.
-//!
-//! All grounded against iced 0.14: `button::{primary,text}` provide status-aware bases, and
-//! `extended_palette()` exposes the active theme's color groups.
+//! Widget style helpers, grounded against iced 0.14: `button::{primary,text}` provide
+//! status-aware bases, and `extended_palette()` exposes the active theme's color groups.
 
 use iced::widget::{button, container};
 use iced::{Border, Color, Theme, border};

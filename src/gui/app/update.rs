@@ -279,8 +279,16 @@ impl App {
                     SplitId::Sidebar => self.sidebar_px = px.clamp(220.0, 560.0),
                     SplitId::RequestResponse => self.editor_px = px.clamp(220.0, 900.0),
                 }
+                self.config_dirty = true;
                 Task::none()
             }
+            Message::ToggleTheme => self.toggle_theme(),
+            Message::WindowResized(size) => {
+                self.window_resized(size);
+                Task::none()
+            }
+            Message::WindowCloseRequested(id) => self.close_requested(id),
+            Message::ConfigFlushTick => self.flush_config(),
         }
     }
 }

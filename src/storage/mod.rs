@@ -8,7 +8,7 @@ pub mod load;
 pub mod migrate;
 pub mod save;
 
-mod io_util;
+pub(crate) mod io_util;
 
 #[cfg(test)]
 mod tests;

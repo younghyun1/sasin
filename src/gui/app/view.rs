@@ -31,6 +31,9 @@ impl App {
                     button(text("Cookies").size(13))
                         .padding(8)
                         .on_press(Message::ToggleCookieManager),
+                    button(text(theme_glyph(self.prefs.theme)).size(13))
+                        .padding(8)
+                        .on_press(Message::ToggleTheme),
                 ]
                 .spacing(6),
                 env_panel::view(&self.workspace.environments, self.active_env),
@@ -127,6 +130,14 @@ impl App {
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
+    }
+}
+
+/// Temporary theme-toggle affordance (an icon button replaces this in the polish pass).
+fn theme_glyph(theme: crate::persist::ThemeChoice) -> &'static str {
+    match theme {
+        crate::persist::ThemeChoice::Dark => "☀",
+        crate::persist::ThemeChoice::Light => "☾",
     }
 }
 

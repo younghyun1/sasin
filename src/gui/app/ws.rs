@@ -1,30 +1,13 @@
-//! WebSocket session handling: the connection subscription, config building, and message routing.
+//! WebSocket session handling: config building and message routing.
+//! (The connection subscription itself lives in [`super::subscriptions`].)
 
-use iced::Subscription;
-
-use crate::gui::Message;
 use crate::gui::app::App;
 use crate::gui::state::{WsDir, WsRuntime};
 use crate::model::{ApiKeyLoc, Auth, Node, NodePath, WsKind, WsRequest, find_node, resolve_auth};
 use crate::runtime;
-use crate::ws::{self, WsCommand, WsConfig, WsEvent, WsIncoming, WsOutgoing};
+use crate::ws::{WsCommand, WsConfig, WsEvent, WsIncoming, WsOutgoing};
 
 impl App {
-    /// All live subscriptions: every active websocket session plus the workspace file watch.
-    pub fn subscription(&self) -> Subscription<Message> {
-        let mut subs: Vec<Subscription<Message>> = self
-            .ws
-            .iter()
-            .filter(|rt| rt.active)
-            .map(|rt| {
-                ws::connect(rt.path.clone(), rt.config.clone())
-                    .map(|(path, event)| Message::Ws(path, event))
-            })
-            .collect();
-        subs.push(crate::watch::watch(&self.workspace_dir).map(|()| Message::WorkspaceChanged));
-        Subscription::batch(subs)
-    }
-
     /// The session bound to the active tab, if any.
     fn active_ws_mut(&mut self) -> Option<&mut WsRuntime> {
         let path = self

@@ -34,13 +34,26 @@ fn main() -> iced::Result {
 
     let _guards = rt.block_on(async { setup_logger().await });
 
+    // UI preferences drive the initial window and theme; the app tracks and re-saves them.
+    let prefs = crate::persist::load_prefs();
+    let window = iced::window::Settings {
+        size: prefs.window_size(),
+        min_size: Some(iced::Size::new(960.0, 600.0)),
+        maximized: prefs.window.maximized,
+        ..iced::window::Settings::default()
+    };
+
     // Iced 0.14 builder: boot (loads the workspace) + update + view, with a dynamic title.
     iced::application(
-        crate::gui::App::new,
+        move || crate::gui::App::new(prefs),
         crate::gui::App::update,
         crate::gui::App::view,
     )
     .title(crate::gui::App::title)
+    .theme(crate::gui::App::theme)
     .subscription(crate::gui::App::subscription)
+    .window(window)
+    // Close is intercepted so preferences flush before exit (see `App::close_requested`).
+    .exit_on_close_request(false)
     .run()
 }
