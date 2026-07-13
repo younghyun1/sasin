@@ -29,10 +29,7 @@ impl App {
             _ => return,
         };
         let auth = resolve_auth(&self.workspace.root, &path);
-        let env = self
-            .active_env
-            .and_then(|idx| self.workspace.environments.get(idx));
-        let ctx = runtime::VarContext::from_scopes(&self.workspace.globals, env);
+        let ctx = self.var_context(&path);
         let config = build_config(&req, &auth, &ctx);
         // Replace any prior session for this node, then start a fresh one.
         self.ws.retain(|rt| rt.path != path);

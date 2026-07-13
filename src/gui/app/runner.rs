@@ -11,7 +11,7 @@ use crate::gui::runner_state::{CurrentRun, RunnerState};
 use crate::model::{HttpRequest, Node, NodePath, find_node, resolve_auth};
 use crate::models::ResponseModel;
 use crate::runner::{RequestOutcome, RunPlan, flatten_requests, parse_data_file};
-use crate::runtime::{self, VarContext};
+use crate::runtime;
 use crate::scripting;
 
 impl App {
@@ -189,10 +189,7 @@ impl App {
         let name = display_name(&request);
         request.auth = resolve_auth(&self.workspace.root, &path);
 
-        let env = self
-            .active_env
-            .and_then(|i| self.workspace.environments.get(i));
-        let mut ctx = VarContext::from_scopes(&self.workspace.globals, env);
+        let mut ctx = self.var_context(&path);
         if let Some(row) = &data_row {
             for (k, v) in row {
                 ctx.set(k.clone(), v.clone());

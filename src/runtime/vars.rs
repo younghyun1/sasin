@@ -38,6 +38,16 @@ impl VarContext {
         self.map.insert(key.into(), value.into());
     }
 
+    /// Overlay a scope of variables (enabled only); later overlays win. Used to layer folder
+    /// (collection) variables between globals and the environment, Postman-style.
+    pub fn overlay_variables(&mut self, vars: &[Variable]) {
+        for v in vars {
+            if v.enabled {
+                self.map.insert(v.key.clone(), v.value.clone());
+            }
+        }
+    }
+
     /// A snapshot of the current variables (for injection into a script engine).
     pub fn snapshot(&self) -> HashMap<String, String> {
         self.map.clone()

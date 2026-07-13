@@ -174,6 +174,23 @@ pub fn sibling_slugs(roots: &[Node], parent: &[String]) -> std::collections::Has
     nodes.iter().map(|n| n.slug().to_string()).collect()
 }
 
+/// Variable scopes of the ancestor folders of `path`, outermost first (for layering between
+/// globals and the environment). The node itself is not included.
+pub fn folder_var_scopes<'a>(roots: &'a [Node], path: &[String]) -> Vec<&'a [Variable]> {
+    let mut scopes = Vec::new();
+    let mut nodes = roots;
+    for seg in path.iter().take(path.len().saturating_sub(1)) {
+        match nodes.iter().find(|n| n.slug() == seg) {
+            Some(Node::Folder(f)) => {
+                scopes.push(f.variables.as_slice());
+                nodes = &f.children;
+            }
+            _ => break,
+        }
+    }
+    scopes
+}
+
 /// Insert `node` into the folder at `parent` at `index` (clamped; `None` appends).
 /// Returns whether the parent existed.
 pub fn insert_node(

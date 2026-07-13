@@ -69,6 +69,10 @@ impl App {
                         .on_press(Message::CurlImport),
                 ]
                 .spacing(6),
+                button(text("Import Postman collection…").size(12))
+                    .padding(6)
+                    .style(theme::flat)
+                    .on_press(Message::ImportPostmanPressed),
             ]
             .spacing(10)
             .padding(10),

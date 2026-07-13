@@ -16,6 +16,22 @@ use crate::storage::layout::unique_slug;
 use crate::storage::{HistoryRecord, save_workspace, write_history};
 
 impl App {
+    /// Variable context for the node at `path`, layered Postman-style:
+    /// globals < ancestor-folder (collection) variables < active environment.
+    pub(super) fn var_context(&self, path: &[String]) -> runtime::VarContext {
+        let mut ctx = runtime::VarContext::from_scopes(&self.workspace.globals, None);
+        for scope in crate::model::folder_var_scopes(&self.workspace.root, path) {
+            ctx.overlay_variables(scope);
+        }
+        if let Some(env) = self
+            .active_env
+            .and_then(|i| self.workspace.environments.get(i))
+        {
+            ctx.overlay_variables(&env.variables);
+        }
+        ctx
+    }
+
     /// Persist the whole workspace to disk on a blocking thread.
     pub(super) fn save_task(&self) -> Task<Message> {
         let dir = self.workspace_dir.clone();
@@ -64,6 +80,64 @@ impl App {
                 Task::none()
             }
         }
+    }
+
+    /// Pick a Postman v2.1 JSON export and parse it off-thread.
+    pub(super) fn import_postman(&mut self) -> Task<Message> {
+        Task::perform(
+            async move {
+                let Some(handle) = rfd::AsyncFileDialog::new()
+                    .add_filter("Postman collection", &["json"])
+                    .pick_file()
+                    .await
+                else {
+                    return Message::Ignore;
+                };
+                let path = handle.path().to_path_buf();
+                let parsed = tokio::task::spawn_blocking(move || {
+                    std::fs::read_to_string(&path)
+                        .map_err(|e| e.to_string())
+                        .and_then(|text| interop::from_postman(&text))
+                })
+                .await;
+                match parsed {
+                    Ok(Ok(import)) => Message::PostmanImported(Ok(Box::new(import))),
+                    Ok(Err(e)) => Message::PostmanImported(Err(e)),
+                    Err(e) => Message::PostmanImported(Err(e.to_string())),
+                }
+            },
+            |m| m,
+        )
+    }
+
+    /// Land a parsed Postman import: unique root slug, insert, expand, persist.
+    pub(super) fn postman_imported(
+        &mut self,
+        result: Result<Box<interop::PostmanImport>, String>,
+    ) -> Task<Message> {
+        let import = match result {
+            Ok(import) => *import,
+            Err(e) => {
+                self.status = Some(format!("Postman import failed: {e}"));
+                return Task::none();
+            }
+        };
+        let mut folder = import.folder;
+        let mut taken = crate::model::sibling_slugs(&self.workspace.root, &[]);
+        folder.slug = unique_slug(&folder.slug, &mut taken);
+        let slug = folder.slug.clone();
+        self.workspace.root.push(Node::Folder(folder));
+        self.expanded.insert(vec![slug]);
+        let mut status = format!("Imported {} request(s) from Postman.", import.request_count);
+        if !import.warnings.is_empty() {
+            status.push_str(&format!(
+                " {} warning(s): {}",
+                import.warnings.len(),
+                import.warnings.first().map(String::as_str).unwrap_or("")
+            ));
+        }
+        self.status = Some(status);
+        self.save_task()
     }
 
     /// Copy the active request to the clipboard as a curl command.
@@ -184,10 +258,7 @@ impl App {
         let Some(resp) = self.tabs.get(pos).and_then(|t| t.response.clone()) else {
             return;
         };
-        let env = self
-            .active_env
-            .and_then(|i| self.workspace.environments.get(i));
-        let snapshot = runtime::VarContext::from_scopes(&self.workspace.globals, env).snapshot();
+        let snapshot = self.var_context(&path).snapshot();
         let outcome = scripting::run_test(&test, &snapshot, &resp);
         if let Some(tab) = self.tabs.get_mut(pos) {
             tab.script_console.extend(outcome.console);
@@ -223,12 +294,10 @@ impl App {
                 return Task::none();
             }
         };
-        // Resolve auth inheritance, then build the variable context (active env over globals).
+        // Resolve auth inheritance, then build the variable context
+        // (globals < folder variables < active env).
         request.auth = resolve_auth(&self.workspace.root, &path);
-        let env = self
-            .active_env
-            .and_then(|idx| self.workspace.environments.get(idx));
-        let mut ctx = runtime::VarContext::from_scopes(&self.workspace.globals, env);
+        let mut ctx = self.var_context(&path);
 
         // Reset per-send script output; run the pre-request script (may set variables).
         self.tabs[i].script_tests.clear();

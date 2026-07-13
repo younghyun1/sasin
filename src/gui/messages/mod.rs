@@ -115,10 +115,12 @@ pub enum Message {
     NewEnv,
     EnvVar(KvOp),
 
-    // --- curl interop ---
+    // --- curl / Postman interop ---
     CurlImportChanged(String),
     CurlImport,
     CopyAsCurl,
+    ImportPostmanPressed,
+    PostmanImported(Result<Box<crate::interop::PostmanImport>, String>),
 
     // --- WebSocket (NodePath identifies the session) ---
     Ws(NodePath, WsEvent),

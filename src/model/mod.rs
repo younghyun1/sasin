@@ -24,8 +24,8 @@ pub use request::HttpRequest;
 pub use scripts::Scripts;
 pub use settings::{Settings, WsSettings};
 pub use tree::{
-    Folder, Node, NodePath, children_mut, find_node, find_node_mut, insert_node, remove_node,
-    resolve_auth, sibling_slugs,
+    Folder, Node, NodePath, children_mut, find_node, find_node_mut, folder_var_scopes, insert_node,
+    remove_node, resolve_auth, sibling_slugs,
 };
 pub use websocket::{WsKind, WsMessageTemplate, WsRequest};
 pub use workspace::{Workspace, WorkspaceDefaults, WorkspaceManifest};

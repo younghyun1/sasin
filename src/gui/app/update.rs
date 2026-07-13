@@ -49,6 +49,8 @@ impl App {
             }
             Message::CurlImport => self.import_curl(),
             Message::CopyAsCurl => self.copy_as_curl(),
+            Message::ImportPostmanPressed => self.import_postman(),
+            Message::PostmanImported(result) => self.postman_imported(result),
             Message::Ws(path, event) => {
                 self.ws_event(path, event);
                 Task::none()
