@@ -1,4 +1,4 @@
-# Status — P0 through P10 delivered
+# Status — P0 through P16 delivered
 
 Snapshot of the execution against [03-roadmap.md](03-roadmap.md). Branch `feat/p0-stabilize`.
 
@@ -31,6 +31,12 @@ Snapshot of the execution against [03-roadmap.md](03-roadmap.md). Branch `feat/p
 | P10 W1+W2 | `206af63` | custom dark/light theme (Postman-orange accent, dark default) + persisted TOML UI prefs (window, splits, theme) |
 | P10 W3-W5 | `d29a157` | embedded Inter / JetBrains Mono / Lucide fonts; mono code surfaces; highlighter follows theme |
 | P10 W6+W7 | `b8268a6` | split widget restructure + themed divider (hover/drag accent); component polish: underline tabs, status pill/chips, tree icons + aligned badges, KV headers, status bar |
+| P11 ergonomics | `d13ec19` | global shortcuts (Ctrl+Enter/S/W/T/F, Esc) + tree rename/duplicate/new-folder/new-request-in/move up-down; messages module split |
+| P12 response body | `696f811` | ResponseBody Text/Binary + 10 MiB capped capture, hex + inline image preview, save/copy body |
+| P13 search | `ec4d4e7` | sidebar flat search over the live index (name/path/method/url); history filter/show-more/clear |
+| P14 postman | `da108d9` | Postman Collection v2.1 import (folders/bodies/auth/scripts/variables + warnings); folder variables now interpolate (globals < folders < env). **Overrides locked decision D3** (curl-only) per the Postman-parity goal; import only, no export |
+| P15 cookies | `35b3b38` | cookie jar persisted to the cache dir (cookies.json), restored on boot, flushed on close; per-cookie delete + add row |
+| P16 snippets | `2e3142f` | snippet copy as curl/HTTPie/JS fetch/Python requests; request Docs panel (description) |
 
 Each phase: `cargo clippy --all-targets -D warnings` clean (default + `--no-default-features`),
 tests green, sillok-logged. P0/P1/P2/P3a reviewed inline; P3b–P7 and P8 each reviewed in an
@@ -74,9 +80,10 @@ adversarial review→verify workflow pass.
 ## Remaining / out of scope
 
 - Socket.IO and protobuf WS framing (out of scope — raw ws/wss only).
-- HTML *rendering* in Preview (shows source; no embedded browser); inline image preview
-  (response body is stored as `String`, so binary bodies aren't retained for display).
-- Cookie manager add/edit individual cookies (view + clear only).
+- HTML *rendering* in Preview (shows source; no embedded browser — a webview dependency
+  would dwarf the app). Images preview inline since P12.
+- OAuth2 grant flows (token paste only); Postman export (import only, per user decision);
+  OpenAPI/HAR import; drag-and-drop reorder (up/down buttons instead); `pm.sendRequest`.
 - Multi-process temp-file naming on save — low risk for a local single-process tool.
 - WebSocket `verify_tls=false` is not honoured (WS TLS is always verified); disabling it would
   need a hand-rolled rustls dangerous verifier + crypto provider. The WS connect timeout *is*
