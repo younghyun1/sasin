@@ -103,15 +103,25 @@ fn folder_row(
     depth: u16,
     expanded: bool,
 ) -> Element<'static, Message> {
-    let arrow = if expanded { "▾" } else { "▸" };
-    let label = button(row![text(arrow).size(13), text(display(name, slug)).size(14)].spacing(8))
-        .padding(6)
-        .width(Length::Fill)
-        .style(theme::flat)
-        .on_press(Message::ToggleFolder(path.clone()));
+    let arrow = if expanded {
+        theme::icons::CHEVRON_DOWN
+    } else {
+        theme::icons::CHEVRON_RIGHT
+    };
+    let label = button(
+        row![
+            theme::icons::icon(arrow, 12.0),
+            text(display(name, slug)).size(14)
+        ]
+        .spacing(8),
+    )
+    .padding(6)
+    .width(Length::Fill)
+    .style(theme::flat)
+    .on_press(Message::ToggleFolder(path.clone()));
 
     // Run the folder as a collection.
-    let run = button(text("▶").size(11))
+    let run = button(theme::icons::icon(theme::icons::PLAY, 11.0).style(theme::muted))
         .padding(4)
         .style(theme::flat)
         .on_press(Message::OpenRunner(path));
@@ -131,13 +141,13 @@ fn leaf_row(
         .padding(6)
         .width(Length::Fill)
         .style(if selected {
-            theme::selected
+            theme::tree_row_selected
         } else {
             theme::flat
         })
         .on_press(Message::OpenNode(path.clone()));
 
-    let delete = button(text("✕").size(12))
+    let delete = button(theme::icons::icon(theme::icons::X, 11.0).style(theme::muted))
         .padding(4)
         .style(theme::flat)
         .on_press(Message::DeleteNode(path));
@@ -150,6 +160,7 @@ fn method_badge(method: &str) -> Element<'static, Message> {
     text(m.clone())
         .size(10)
         .font(theme::fonts::MONO)
+        .width(Length::Fixed(theme::metrics::BADGE_W))
         .style(move |theme| iced::widget::text::Style {
             color: Some(theme::method_color(&m, theme)),
         })

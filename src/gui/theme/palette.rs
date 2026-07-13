@@ -63,7 +63,7 @@ static LIGHT: LazyLock<Theme> = LazyLock::new(|| {
     })
 });
 
-fn hex(rgb: u32) -> Color {
+pub(super) fn hex(rgb: u32) -> Color {
     Color::from_rgb8(
         ((rgb >> 16) & 0xff) as u8,
         ((rgb >> 8) & 0xff) as u8,

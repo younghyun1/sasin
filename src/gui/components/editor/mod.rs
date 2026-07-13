@@ -7,6 +7,7 @@ use iced::widget::{Space, button, column, container, pick_list, row, text, text_
 use iced::{Element, Length};
 
 use crate::gui::Message;
+use crate::gui::components::tab_strip;
 use crate::gui::messages::EditorPanel;
 use crate::gui::state::Tab;
 use crate::gui::theme;
@@ -32,23 +33,27 @@ pub fn view<'a>(
         .width(Length::Fill);
     let send_label = if tab.sending { "Sending…" } else { "Send" };
     let send = button(text(send_label).size(15))
-        .padding(10)
+        .padding([10, 24])
+        .style(theme::selected)
         .on_press_maybe((!tab.sending).then_some(Message::SendPressed));
     let top = row![method, url, send]
         .spacing(10)
         .align_y(Vertical::Center);
 
     let actions = row![
-        text(&tab.name).size(14),
+        text(&tab.name).size(14).font(theme::fonts::UI_SEMIBOLD),
         Space::new().width(Length::Fill),
         button(text("Copy curl").size(13))
             .padding(8)
+            .style(theme::flat)
             .on_press(Message::CopyAsCurl),
         button(text("Save").size(13))
             .padding(8)
+            .style(theme::flat)
             .on_press(Message::SaveActiveTab),
         button(text("Cancel").size(13))
             .padding(8)
+            .style(theme::flat)
             .on_press_maybe(tab.sending.then_some(Message::CancelPressed)),
     ]
     .spacing(10)
@@ -74,14 +79,11 @@ pub fn view<'a>(
 
 fn panel_bar(active: EditorPanel) -> Element<'static, Message> {
     let make = |label: &'static str, panel: EditorPanel| {
-        let btn = button(text(label).size(13))
-            .padding(8)
-            .on_press(Message::SelectPanel(panel));
-        if panel == active {
-            btn.style(theme::selected)
-        } else {
-            btn.style(theme::flat)
-        }
+        tab_strip::tab(
+            text(label).size(13),
+            panel == active,
+            Message::SelectPanel(panel),
+        )
     };
     row![
         make("Params", EditorPanel::Params),
@@ -91,6 +93,6 @@ fn panel_bar(active: EditorPanel) -> Element<'static, Message> {
         make("Scripts", EditorPanel::Scripts),
         make("Settings", EditorPanel::Settings),
     ]
-    .spacing(6)
+    .spacing(2)
     .into()
 }

@@ -1,6 +1,7 @@
 //! Sidebar request-history list: the most recent sends, newest first. Clicking an entry re-creates
 //! the request (method + url) and opens it.
 
+use iced::alignment::Vertical;
 use iced::widget::{button, column, row, text};
 use iced::{Element, Length};
 
@@ -13,7 +14,7 @@ const SHOWN: usize = 10;
 
 /// Render the history section from the persisted cache.
 pub fn view(history: &HistoryCache) -> Element<'static, Message> {
-    let mut col = column![text("History").size(14)]
+    let mut col = column![text("HISTORY").size(11).style(theme::muted)]
         .spacing(4)
         .width(Length::Fill);
     if history.records.is_empty() {
@@ -23,9 +24,17 @@ pub fn view(history: &HistoryCache) -> Element<'static, Message> {
     // Records are stored newest-last; show the tail, newest first. Pass the record by value so the
     // click is self-contained (a positional index could shift if the cap-drain runs meanwhile).
     for record in history.records.iter().rev().take(SHOWN) {
-        let label = format!("{} {}", record.method, truncate(&record.url, 40));
+        let method = record.method.clone();
+        let badge = text(method.clone())
+            .size(10)
+            .font(theme::fonts::MONO)
+            .width(Length::Fixed(theme::metrics::BADGE_W))
+            .style(move |t: &iced::Theme| iced::widget::text::Style {
+                color: Some(theme::method_color(&method, t)),
+            });
+        let label = text(truncate(&record.url, 36)).size(12);
         col = col.push(
-            button(row![text(label).size(12)])
+            button(row![badge, label].spacing(6).align_y(Vertical::Center))
                 .padding(4)
                 .width(Length::Fill)
                 .style(theme::flat)

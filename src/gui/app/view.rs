@@ -31,9 +31,6 @@ impl App {
                     button(text("Cookies").size(13))
                         .padding(8)
                         .on_press(Message::ToggleCookieManager),
-                    button(theme_icon(self.prefs.theme))
-                        .padding(8)
-                        .on_press(Message::ToggleTheme),
                 ]
                 .spacing(6),
                 env_panel::view(&self.workspace.environments, self.active_env),
@@ -123,16 +120,40 @@ impl App {
             .on_drag(|px| Message::SplitDragged(SplitId::Sidebar, px))
             .into();
 
-        let status: Element<'_, Message> = match &self.status {
-            Some(s) => text(s).size(12).into(),
-            None => Space::new().height(Length::Fixed(0.0)).into(),
-        };
-
-        container(column![content, status].spacing(4))
-            .padding(10)
+        container(column![content, self.status_bar()])
+            .style(theme::surface)
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
+    }
+
+    /// Permanent bottom strip: status text left; active environment + theme toggle right.
+    fn status_bar(&self) -> Element<'_, Message> {
+        let status = text(self.status.as_deref().unwrap_or("")).size(12);
+        let env_name = self
+            .active_env
+            .and_then(|i| self.workspace.environments.get(i))
+            .map(|e| if e.name.is_empty() { &e.slug } else { &e.name })
+            .cloned()
+            .unwrap_or_else(|| "no environment".to_string());
+        container(
+            row![
+                status,
+                Space::new().width(Length::Fill),
+                text(env_name).size(12).style(theme::muted),
+                button(theme_icon(self.prefs.theme))
+                    .padding(2)
+                    .style(theme::flat)
+                    .on_press(Message::ToggleTheme),
+            ]
+            .spacing(10)
+            .align_y(iced::alignment::Vertical::Center),
+        )
+        .style(theme::status_bar)
+        .padding([2, 10])
+        .height(Length::Fixed(theme::metrics::STATUS_BAR_H))
+        .width(Length::Fill)
+        .into()
     }
 }
 
@@ -142,7 +163,7 @@ fn theme_icon<'a>(choice: crate::persist::ThemeChoice) -> iced::widget::Text<'a>
         crate::persist::ThemeChoice::Dark => theme::icons::SUN,
         crate::persist::ThemeChoice::Light => theme::icons::MOON,
     };
-    theme::icons::icon(glyph, 13.0)
+    theme::icons::icon(glyph, 14.0)
 }
 
 /// A compact strip of test results + console output from the last script run (empty when none).

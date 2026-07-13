@@ -42,10 +42,14 @@ pub fn view(envs: &[Environment], active: Option<usize>) -> Element<'_, Message>
         None => text("No environment.").size(12).into(),
     };
 
-    column![text("Environment").size(14), row(selector).spacing(4), vars]
-        .spacing(6)
-        .width(Length::Fill)
-        .into()
+    column![
+        text("ENVIRONMENT").size(11).style(theme::muted),
+        row(selector).spacing(4),
+        vars
+    ]
+    .spacing(6)
+    .width(Length::Fill)
+    .into()
 }
 
 fn variables_table(vars: &[Variable]) -> Element<'_, Message> {
@@ -62,14 +66,16 @@ fn variables_table(vars: &[Variable]) -> Element<'_, Message> {
             .padding(4)
             .size(12)
             .width(Length::FillPortion(3));
-        let delete = button(text("✕").size(11))
+        let delete = button(theme::icons::icon(theme::icons::TRASH, 11.0).style(theme::muted))
             .padding(4)
+            .style(theme::flat)
             .on_press(Message::EnvVar(KvOp::Remove(i)));
         rows.push(row![enabled, key, value, delete].spacing(4).into());
     }
     rows.push(
         button(text("+ var").size(11))
             .padding(4)
+            .style(theme::flat)
             .on_press(Message::EnvVar(KvOp::Add))
             .into(),
     );

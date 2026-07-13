@@ -20,6 +20,16 @@ pub const BYTES: &[u8] = include_bytes!("../../../assets/fonts/lucide.ttf");
 
 pub const SUN: char = '\u{e178}';
 pub const MOON: char = '\u{e11e}';
+pub const CHEVRON_RIGHT: char = '\u{e06f}';
+pub const CHEVRON_DOWN: char = '\u{e06d}';
+pub const X: char = '\u{e1b2}';
+pub const CHECK: char = '\u{e06c}';
+pub const CIRCLE_X: char = '\u{e084}';
+pub const PLAY: char = '\u{e13c}';
+pub const TRASH: char = '\u{e18e}';
+pub const ARROW_LEFT: char = '\u{e048}';
+pub const ARROW_RIGHT: char = '\u{e049}';
+pub const DOT: char = '\u{e44f}';
 
 /// A single icon glyph as a text widget; color/style comes from the surrounding context.
 pub fn icon<'a>(glyph: char, size: f32) -> Text<'a> {

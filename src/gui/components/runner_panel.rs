@@ -100,21 +100,42 @@ pub fn view(runner: &RunnerState) -> Element<'_, Message> {
 }
 
 fn outcome_row(o: &RequestOutcome) -> Element<'_, Message> {
-    let mark = if o.passed() { "✓" } else { "✗" };
+    let passed = o.passed();
+    let mark = theme::icons::icon(
+        if passed {
+            theme::icons::CHECK
+        } else {
+            theme::icons::CIRCLE_X
+        },
+        12.0,
+    )
+    .style(move |t: &iced::Theme| {
+        let p = t.extended_palette();
+        iced::widget::text::Style {
+            color: Some(if passed {
+                p.success.base.color
+            } else {
+                p.danger.base.color
+            }),
+        }
+    });
     let status = o
         .status
         .map(|c| c.to_string())
         .unwrap_or_else(|| "—".to_string());
-    let mut col = column![
+    let head = row![
+        mark,
         text(format!(
-            "{mark} {} · iter {} · {status} · {} ms",
+            "{} · iter {} · {status} · {} ms",
             o.name,
             o.iteration + 1,
             o.duration_ms
         ))
         .size(13)
     ]
-    .spacing(2);
+    .spacing(6)
+    .align_y(Vertical::Center);
+    let mut col = column![head].spacing(2);
     if let Some(e) = &o.error {
         col = col.push(text(format!("    error: {e}")).size(11));
     }

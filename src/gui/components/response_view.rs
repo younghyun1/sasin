@@ -7,6 +7,7 @@ use iced::widget::{Space, button, column, container, row, scrollable, text, text
 use iced::{Element, Length};
 
 use crate::gui::Message;
+use crate::gui::components::tab_strip;
 use crate::gui::messages::ResponseTab;
 use crate::gui::theme;
 use crate::models::ResponseModel;
@@ -82,14 +83,28 @@ impl<'a> ResponseView<'a> {
     }
 
     fn view_response(&self, resp: &'a ResponseModel) -> Element<'a, Message> {
-        let stats = text(format!(
-            "Status: {} {} • Duration: {:?} • Body: {} bytes",
-            resp.status.code,
-            resp.status.reason,
-            resp.duration,
-            resp.body.len()
-        ))
-        .size(14);
+        let code = resp.status.code;
+        let status_pill = container(
+            text(format!("{} {}", code, resp.status.reason))
+                .size(12)
+                .font(theme::fonts::UI_SEMIBOLD)
+                .style(move |t: &iced::Theme| iced::widget::text::Style {
+                    color: Some(theme::status_color(code, t)),
+                }),
+        )
+        .padding([3, 10])
+        .style(theme::pill_for_status(code));
+        let stats = row![
+            status_pill,
+            text(format!("{:?}", resp.duration))
+                .size(12)
+                .style(theme::muted),
+            text(format_bytes(resp.body.len()))
+                .size(12)
+                .style(theme::muted),
+        ]
+        .spacing(10)
+        .align_y(Vertical::Center);
 
         let content = match self.tab {
             ResponseTab::Body => self.body_view(resp),
@@ -107,14 +122,11 @@ impl<'a> ResponseView<'a> {
 
     fn toolbar(&self) -> Element<'a, Message> {
         let tab_btn = |label: &'static str, tab: ResponseTab| {
-            let b = button(text(label).size(12))
-                .padding(6)
-                .on_press(Message::SelectResponseTab(tab));
-            if tab == self.tab {
-                b.style(theme::selected)
-            } else {
-                b.style(theme::flat)
-            }
+            tab_strip::tab(
+                text(label).size(12),
+                tab == self.tab,
+                Message::SelectResponseTab(tab),
+            )
         };
         let mut bar = row![
             tab_btn("Body", ResponseTab::Body),
@@ -122,7 +134,7 @@ impl<'a> ResponseView<'a> {
             tab_btn("Cookies", ResponseTab::Cookies),
             tab_btn("Preview", ResponseTab::Preview),
         ]
-        .spacing(4)
+        .spacing(2)
         .align_y(Vertical::Center);
 
         if self.tab == ResponseTab::Body {
@@ -263,6 +275,17 @@ fn preview_view(resp: &ResponseModel) -> Element<'static, Message> {
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
+}
+
+/// Human-readable byte count for the stats chips.
+fn format_bytes(n: usize) -> String {
+    if n >= 1024 * 1024 {
+        format!("{:.1} MB", n as f64 / (1024.0 * 1024.0))
+    } else if n >= 1024 {
+        format!("{:.1} KB", n as f64 / 1024.0)
+    } else {
+        format!("{n} B")
+    }
 }
 
 /// Best-effort body formatting: pretty-print JSON when enabled and parseable, else the raw body.

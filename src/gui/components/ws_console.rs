@@ -28,8 +28,14 @@ pub fn view<'a>(req: &'a WsRequest, rt: Option<&'a WsRuntime>) -> Element<'a, Me
     } else {
         req.url.as_str()
     };
+    let state_pill: Element<'a, Message> = if connected {
+        pill_text("connected", true)
+    } else {
+        pill_text("disconnected", false)
+    };
     let bar = row![
         text(format!("WebSocket — {url}")).size(14),
+        state_pill,
         Space::new().width(Length::Fill),
         connect,
     ]
@@ -40,15 +46,18 @@ pub fn view<'a>(req: &'a WsRequest, rt: Option<&'a WsRuntime>) -> Element<'a, Me
         Some(r) if !r.transcript.is_empty() => {
             let mut col = column![].spacing(2).width(Length::Fill);
             for line in &r.transcript {
-                let prefix = match line.dir {
-                    WsDir::In => "←",
-                    WsDir::Out => "→",
-                    WsDir::Info => "•",
+                let glyph = match line.dir {
+                    WsDir::In => theme::icons::ARROW_LEFT,
+                    WsDir::Out => theme::icons::ARROW_RIGHT,
+                    WsDir::Info => theme::icons::DOT,
                 };
                 col = col.push(
-                    text(format!("{prefix} {}", line.text))
-                        .size(12)
-                        .font(theme::fonts::MONO),
+                    row![
+                        theme::icons::icon(glyph, 11.0).style(theme::muted),
+                        text(line.text.clone()).size(12).font(theme::fonts::MONO),
+                    ]
+                    .spacing(6)
+                    .align_y(Vertical::Center),
                 );
             }
             scrollable(col)
@@ -99,4 +108,21 @@ pub fn view<'a>(req: &'a WsRequest, rt: Option<&'a WsRuntime>) -> Element<'a, Me
 
 fn container_note(msg: &str) -> Element<'_, Message> {
     text(msg).size(13).into()
+}
+
+/// Small connected/disconnected state label colored by success/danger.
+fn pill_text(label: &'static str, ok: bool) -> Element<'static, Message> {
+    text(label)
+        .size(11)
+        .style(move |t: &iced::Theme| {
+            let p = t.extended_palette();
+            iced::widget::text::Style {
+                color: Some(if ok {
+                    p.success.base.color
+                } else {
+                    p.danger.base.color
+                }),
+            }
+        })
+        .into()
 }
